@@ -299,7 +299,20 @@ class BaseControl:
         """
         Calculates the required AC charge power to deliver the target energy
         within the remaining time frame.
+
+        During normal EOS operation: Converts energy (Wh) stored in current_ac_charge_demand
+        to power (W) based on remaining time in the current time frame.
+
+        During override: Returns current_ac_charge_demand directly as it's already
+        set as power (W), not energy (Wh).
+
+        This fixes issue #173 where override values were incorrectly converted.
         """
+        # During override, current_ac_charge_demand is already in W, return it directly
+        if self.override_active:
+            return self.current_ac_charge_demand
+
+        # Normal EOS operation: convert energy (Wh) to power (W)
         current_time = datetime.now(self.time_zone)
         # Calculate the seconds elapsed in the current time frame with time_frame_base
         seconds_elapsed = (
