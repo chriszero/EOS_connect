@@ -340,7 +340,7 @@ All endpoints return JSON and can be accessed via HTTP requests.
 
 | Endpoint                            | Method | Returns / Accepts | Description                                                    |
 | ----------------------------------- | ------ | ----------------- | -------------------------------------------------------------- |
-| `/json/current_controls.json`       | GET    | JSON              | Current system control states (AC/DC charge, mode, etc.)       |
+| `/json/current_controls.json`       | GET    | JSON              | Current system control states (AC/DC charge, mode, discharge state, etc.) - reflects final combined state after all overrides |
 | `/json/optimize_request.json`       | GET    | JSON              | Last optimization request sent to EOS                          |
 | `/json/optimize_response.json`      | GET    | JSON              | Last optimization response from EOS                            |
 | `/json/optimize_request.test.json`  | GET    | JSON              | Test optimization request (static file)                        |
@@ -420,12 +420,26 @@ Get current system control states and battery information.
     "api_version": "0.0.1"
 }
 ```
+
+**Important Notes:**
+- **`current_discharge_allowed`**: This field reflects the **final effective state** after all overrides (EVCC modes, manual overrides) are applied. For example:
+  - When EVCC is charging in PV mode (`"inverter_mode": "MODE DISCHARGE ALLOWED EVCC PV"`), `current_discharge_allowed` will be `true` even if the optimizer originally suggested avoiding discharge
+  - This ensures consistency between the mode and discharge state for integrations like Home Assistant
+- **Inverter modes**:
+  - `0` = MODE CHARGE FROM GRID
+  - `1` = MODE AVOID DISCHARGE
+  - `2` = MODE DISCHARGE ALLOWED
+  - `3` = MODE AVOID DISCHARGE EVCC FAST (fast charging)
+  - `4` = MODE DISCHARGE ALLOWED EVCC PV (EV charging in PV mode)
+  - `5` = MODE DISCHARGE ALLOWED EVCC MIN+PV (EV charging in Min+PV mode)
+  - `6` = MODE CHARGE FROM GRID EVCC FAST (grid charging during fast EV charge)
+
 </details>
 
 ---
 
 <details>
-<summary>Show Example: <code>/json/optimize_request.json</code> (GET)</summary>
+<parameter name="summary">Show Example: <code>/json/optimize_request.json</code> (GET)
 
 Get the last optimization request sent to EOS.
 
@@ -822,7 +836,7 @@ EOS Connect publishes a wide range of real-time system data and control states t
 | `status`                                      | `myhome/eos_connect/status`                                      | String (`"online"`)        | Always set to `"online"`                                    |
 | `control/eos_ac_charge_demand`                | `myhome/eos_connect/control/eos_ac_charge_demand`                | Integer (W)                | AC charge demand                                            |
 | `control/eos_dc_charge_demand`                | `myhome/eos_connect/control/eos_dc_charge_demand`                | Integer (W)                | DC charge demand                                            |
-| `control/eos_discharge_allowed`               | `myhome/eos_connect/control/eos_discharge_allowed`               | Boolean                    | Discharge allowed                                           |
+| `control/eos_discharge_allowed`               | `myhome/eos_connect/control/eos_discharge_allowed`               | Boolean                    | Discharge allowed (final effective state after all overrides) |
 
 
 
@@ -847,6 +861,7 @@ You can use any MQTT client, automation platform, or dashboard tool to subscribe
 - The `<mqtt_configured_prefix>` is set in your configuration file (see `config.yaml`).
 - Some topics (e.g., inverter special values) are only published if the corresponding hardware is present and enabled.
 - All topics are published with real-time updates as soon as new data is available.
+- **State Consistency**: The `control/eos_discharge_allowed` topic reflects the **final effective state** after combining optimizer output, EVCC overrides, and manual overrides. This ensures that all outputs (MQTT, Web API, inverter commands) consistently represent EOS_connect's final decision.
 
 </details>
 </br>

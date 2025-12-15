@@ -645,6 +645,14 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
     base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
+
+    # set the current battery state of charge
+    base_control.set_current_battery_soc(battery_interface.get_current_soc())
+    # getting the current charging state from evcc
+    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
+    base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
+
+    # Publish MQTT after all states are set to reflect the final combined state
     mqtt_interface.update_publish_topics(
         {
             "control/eos_ac_charge_demand": {
@@ -654,15 +662,10 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
                 "value": base_control.get_current_dc_charge_demand()
             },
             "control/eos_discharge_allowed": {
-                "value": base_control.get_current_discharge_allowed()
+                "value": base_control.get_effective_discharge_allowed()
             },
         }
     )
-    # set the current battery state of charge
-    base_control.set_current_battery_soc(battery_interface.get_current_soc())
-    # getting the current charging state from evcc
-    base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
-    base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
 
     last_control_data["current_soc"] = current_soc
     last_control_data["ac_charge_demand"] = ac_charge_demand_rel
@@ -1440,7 +1443,8 @@ def get_controls():
     """
     current_ac_charge_demand = base_control.get_current_ac_charge_demand()
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
-    current_discharge_allowed = base_control.get_current_discharge_allowed()
+    # Use effective discharge allowed state (reflects final state after EVCC/manual overrides)
+    current_discharge_allowed = base_control.get_effective_discharge_allowed()
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
     current_inverter_mode = base_control.get_current_overall_state()

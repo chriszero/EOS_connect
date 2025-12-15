@@ -253,5 +253,173 @@ class TestMQTTInverterParity:
         ), "MQTT and Inverter must always show the same power value"
 
 
+class TestEffectiveDischargeAllowed:
+    """Test suite for effective discharge allowed - Issue #175
+
+    Tests that the effective discharge allowed state reflects the FINAL state
+    after all overrides (EVCC, manual) are applied, not just the optimizer output.
+    """
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_discharge_allowed_without_evcc(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test discharge allowed state without EVCC override"""
+        # Mock datetime to return a fixed time
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        # Set discharge allowed from optimizer
+        base_control.set_current_discharge_allowed(True)
+
+        # Without EVCC, both should match
+        assert base_control.get_current_discharge_allowed() == True
+        assert base_control.get_effective_discharge_allowed() == True
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_discharge_not_allowed_without_evcc(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test discharge not allowed state without EVCC override"""
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        # Set discharge not allowed from optimizer
+        base_control.set_current_discharge_allowed(False)
+
+        # Without EVCC, both should match
+        assert base_control.get_current_discharge_allowed() == False
+        assert base_control.get_effective_discharge_allowed() == False
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_evcc_pv_mode_overrides_to_discharge_allowed(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test that EVCC PV mode sets effective discharge to True - Issue #175
+
+        This reproduces the bug: optimizer says discharge_allowed=False,
+        but EVCC PV mode should make effective discharge allowed = True
+        """
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        # Simulate the issue scenario from #175
+        base_control.set_current_ac_charge_demand(0)
+        base_control.set_current_dc_charge_demand(5000)
+        base_control.set_current_discharge_allowed(False)  # Optimizer says no discharge
+
+        # EVCC is charging in PV mode
+        base_control.set_current_evcc_charging_state(True)
+        base_control.set_current_evcc_charging_mode("pv")
+
+        # Original optimizer value should still be False
+        assert base_control.get_current_discharge_allowed() == False
+
+        # But effective discharge should be True due to EVCC PV mode
+        assert base_control.get_effective_discharge_allowed() == True
+
+        # Mode should be MODE_DISCHARGE_ALLOWED_EVCC_PV (4)
+        assert base_control.get_current_overall_state_number() == 4
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_evcc_minpv_mode_overrides_to_discharge_allowed(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test that EVCC Min+PV mode sets effective discharge to True"""
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        base_control.set_current_ac_charge_demand(0)
+        base_control.set_current_dc_charge_demand(3000)
+        base_control.set_current_discharge_allowed(False)  # Optimizer says no discharge
+
+        # EVCC is charging in Min+PV mode
+        base_control.set_current_evcc_charging_state(True)
+        base_control.set_current_evcc_charging_mode("minpv")
+
+        # Original optimizer value should still be False
+        assert base_control.get_current_discharge_allowed() == False
+
+        # But effective discharge should be True due to EVCC Min+PV mode
+        assert base_control.get_effective_discharge_allowed() == True
+
+        # Mode should be MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV (5)
+        assert base_control.get_current_overall_state_number() == 5
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_evcc_fast_charge_keeps_discharge_not_allowed(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test that EVCC fast charge mode keeps effective discharge as False"""
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        base_control.set_current_ac_charge_demand(0)
+        base_control.set_current_dc_charge_demand(0)
+        base_control.set_current_discharge_allowed(False)
+
+        # EVCC is fast charging
+        base_control.set_current_evcc_charging_state(True)
+        base_control.set_current_evcc_charging_mode("now")
+
+        # Both should be False - fast charge avoids discharge
+        assert base_control.get_current_discharge_allowed() == False
+        assert base_control.get_effective_discharge_allowed() == False
+
+        # Mode should be MODE_AVOID_DISCHARGE_EVCC_FAST (3)
+        assert base_control.get_current_overall_state_number() == 3
+
+    @patch("src.interfaces.base_control.datetime")
+    def test_evcc_pv_mode_with_grid_charge_overrides_to_pv_mode(
+        self, mock_datetime, config_base, berlin_timezone
+    ):
+        """Test that EVCC PV mode overrides even when grid charge is requested
+
+        Current behavior: EVCC PV mode takes precedence over grid charge
+        (only fast charge modes preserve grid charge as GRID_CHARGE_EVCC_FAST)
+        """
+        mock_datetime.now.return_value = datetime(
+            2024, 10, 4, 10, 0, 0, tzinfo=berlin_timezone
+        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        base_control = BaseControl(config_base, berlin_timezone, 3600)
+
+        # Grid charging requested by optimizer
+        base_control.set_current_ac_charge_demand(2500)
+        base_control.set_current_dc_charge_demand(0)
+        base_control.set_current_discharge_allowed(False)
+
+        # EVCC is in PV mode - overrides to EVCC PV mode
+        base_control.set_current_evcc_charging_state(True)
+        base_control.set_current_evcc_charging_mode("pv")
+
+        # Current behavior: EVCC PV mode overrides grid charge
+        assert (
+            base_control.get_current_overall_state_number() == 4
+        )  # MODE_DISCHARGE_ALLOWED_EVCC_PV
+        assert base_control.get_effective_discharge_allowed() == True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

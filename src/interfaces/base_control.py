@@ -118,6 +118,23 @@ class BaseControl:
         """
         return self.current_discharge_allowed
 
+    def get_effective_discharge_allowed(self):
+        """
+        Returns the effective discharge allowed state based on the final overall state.
+        This reflects the FINAL state after all overrides (EVCC, manual) are applied.
+
+        Returns:
+            bool: True if discharge is allowed in the current effective state, False otherwise.
+        """
+        # Modes where discharge is explicitly allowed
+        discharge_allowed_modes = [
+            MODE_DISCHARGE_ALLOWED,  # 2: Normal discharge allowed
+            MODE_DISCHARGE_ALLOWED_EVCC_PV,  # 4: EVCC PV mode (discharge to support EV)
+            MODE_DISCHARGE_ALLOWED_EVCC_MIN_PV,  # 5: EVCC Min+PV mode (discharge to support EV)
+        ]
+
+        return self.current_overall_state in discharge_allowed_modes
+
     def get_current_overall_state(self):
         """
         Returns the current overall state.
