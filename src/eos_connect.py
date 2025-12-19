@@ -872,8 +872,25 @@ class OptimizationScheduler:
         optimized_response, avg_runtime = eos_interface.optimize(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
-        # Store the runtime for use in sleep calculation
-        self._last_avg_runtime = avg_runtime
+        # Store the runtime for use in sleep calculation (defensive against None)
+        try:
+            if avg_runtime is None:
+                # keep previous value or default if not present
+                self._last_avg_runtime = getattr(self, "_last_avg_runtime", 120)
+                logger.warning(
+                    "[Main] optimize() returned no avg_runtime; keeping previous value: %s",
+                    self._last_avg_runtime,
+                )
+            else:
+                self._last_avg_runtime = avg_runtime
+        except (TypeError, AttributeError) as e:
+            # fallback to a sensible default and log the specific error
+            logger.warning(
+                "[Main] Error processing avg_runtime (%s): %s. Falling back to default.",
+                type(avg_runtime).__name__ if "avg_runtime" in locals() else "Unknown",
+                e,
+            )
+            self._last_avg_runtime = 120
 
         json_optimize_input["timestamp"] = datetime.now(time_zone).isoformat()
         self.last_request_response["request"] = json.dumps(
