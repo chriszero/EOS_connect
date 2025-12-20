@@ -509,6 +509,11 @@ def create_optimize_request():
             else config_manager.config["battery"]["max_charge_power_w"]
         )
 
+        # Store this value in base_control so it can use the same value when
+        # converting relative charge demands back to absolute values
+        # This prevents sawtooth patterns caused by mismatched max_charge_power values
+        base_control.optimization_max_charge_power_w = max_charge_power
+
         akku_object = {
             "capacity_wh": config_manager.config["battery"]["capacity_wh"],
             "charging_efficiency": config_manager.config["battery"][

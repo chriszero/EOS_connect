@@ -66,6 +66,9 @@ class BaseControl:
         self.current_battery_soc = 0
         self.time_zone = timezone
         self.config = config
+        # Track the max_charge_power_w value used in the last optimization request
+        # to ensure consistent conversion of relative charge values
+        self.optimization_max_charge_power_w = config["battery"]["max_charge_power_w"]
         self._state_change_timestamps = []
         self.update_interval = 15  # seconds
         self._update_thread = None
@@ -187,11 +190,11 @@ class BaseControl:
     def set_current_ac_charge_demand(self, value_relative):
         """
         Sets the current AC charge demand.
+        Uses the optimization_max_charge_power_w to convert relative values
+        to ensure consistency with the value sent to the optimizer.
         """
         current_hour = datetime.now(self.time_zone).hour
-        current_charge_demand = (
-            value_relative * self.config["battery"]["max_charge_power_w"]
-        )
+        current_charge_demand = value_relative * self.optimization_max_charge_power_w
         if current_charge_demand == self.current_ac_charge_demand:
             # No change, so do not log
             return
@@ -201,10 +204,10 @@ class BaseControl:
             self.current_ac_charge_demand = current_charge_demand
             logger.debug(
                 "[BASE-CTRL] set AC charge demand for current hour %s:00 -> %s Wh -"
-                + " based on max charge power %s W",
+                + " based on optimization max charge power %s W",
                 current_hour,
                 self.current_ac_charge_demand,
-                self.config["battery"]["max_charge_power_w"],
+                self.optimization_max_charge_power_w,
             )
         elif self.override_active_since > time.time() - 2:
             # self.current_ac_charge_demand = (
@@ -222,11 +225,11 @@ class BaseControl:
     def set_current_dc_charge_demand(self, value_relative):
         """
         Sets the current DC charge demand.
+        Uses the optimization_max_charge_power_w to convert relative values
+        to ensure consistency with the value sent to the optimizer.
         """
         current_hour = datetime.now(self.time_zone).hour
-        current_charge_demand = (
-            value_relative * self.config["battery"]["max_charge_power_w"]
-        )
+        current_charge_demand = value_relative * self.optimization_max_charge_power_w
         if current_charge_demand == self.current_dc_charge_demand:
             # logger.debug(
             #     "[BASE-CTRL] NO CHANGE DC charge demand for current hour %s:00 "+
@@ -243,10 +246,10 @@ class BaseControl:
             self.current_dc_charge_demand = current_charge_demand
             logger.debug(
                 "[BASE-CTRL] set DC charge demand for current hour %s:00 -> %s Wh -"
-                + " based on max charge power %s W",
+                + " based on optimization max charge power %s W",
                 current_hour,
                 self.current_dc_charge_demand,
-                self.config["battery"]["max_charge_power_w"],
+                self.optimization_max_charge_power_w,
             )
         else:
             logger.debug(
