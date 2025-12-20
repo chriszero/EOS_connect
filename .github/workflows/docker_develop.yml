@@ -15,8 +15,8 @@ name: Develop - build image and push
 on:
   push:
     branches: ["develop"]
-  pull_request:
-    branches: ["develop"]
+  # pull_request:
+  #   branches: ["develop"]
   workflow_dispatch: # allows manual triggering of the workflow
 
 env:

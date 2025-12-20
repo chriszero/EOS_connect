@@ -89,6 +89,7 @@ class ConfigManager:
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
                         "price_euro_per_wh_accu": 0.0,  # price for battery in euro/Wh
+                        "price_euro_per_wh_sensor": "",  # sensor/item providing battery energy cost in €/Wh
                         "charging_curve_enabled": True,  # enable charging curve
                     }
                 ),
@@ -280,6 +281,10 @@ class ConfigManager:
         )
         config["battery"].yaml_add_eol_comment(
             "price for battery in euro/Wh - default: 0.0", "price_euro_per_wh_accu"
+        )
+        config["battery"].yaml_add_eol_comment(
+            "sensor/item providing the battery price (€/Wh) - HA entity or OpenHAB item",
+            "price_euro_per_wh_sensor",
         )
         config["battery"].yaml_add_eol_comment(
             "enabling charging curve for controlled charging power"
