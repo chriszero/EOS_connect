@@ -30,7 +30,6 @@ def default_config():
         "charging_curve_enabled": True,
         "discharge_efficiency": 1.0,
         "price_euro_per_wh_accu": 0.0,
-        "price_euro_per_wh_source": "config",
         "price_euro_per_wh_sensor": "",
     }
 
@@ -69,7 +68,7 @@ def test_openhab_fetch_success(default_config):
         mock_resp.json.return_value = {"state": "80"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_openhab()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 80
 
 
@@ -87,7 +86,7 @@ def test_openhab_fetch_decimal_format(default_config):
         mock_resp.json.return_value = {"state": "0.75"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_openhab()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 75.0
 
 
@@ -106,7 +105,7 @@ def test_homeassistant_fetch_success(default_config):
         mock_resp.json.return_value = {"state": "55"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_homeassistant()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 55.0
 
 
@@ -119,7 +118,7 @@ def test_homeassistant_price_sensor_success(default_config):
         {
             "url": "http://fake",
             "access_token": "token",
-            "price_euro_per_wh_source": "homeassistant",
+            "source": "homeassistant",
             "price_euro_per_wh_sensor": "sensor.accu_price",
         }
     )
@@ -144,7 +143,7 @@ def test_homeassistant_price_sensor_failure_keeps_last_value(default_config):
         {
             "url": "http://fake",
             "access_token": "token",
-            "price_euro_per_wh_source": "homeassistant",
+            "source": "homeassistant",
             "price_euro_per_wh_sensor": "sensor.accu_price",
             "price_euro_per_wh_accu": 0.001,
         }
@@ -167,7 +166,7 @@ def test_openhab_price_sensor_success(default_config):
     test_config.update(
         {
             "url": "http://fake",
-            "price_euro_per_wh_source": "openhab",
+            "source": "openhab",
             "price_euro_per_wh_sensor": "BatteryPrice",
         }
     )
@@ -191,7 +190,7 @@ def test_openhab_price_sensor_with_unit_success(default_config):
     test_config.update(
         {
             "url": "http://fake",
-            "price_euro_per_wh_source": "openhab",
+            "source": "openhab",
             "price_euro_per_wh_sensor": "BatteryPrice",
         }
     )
@@ -214,7 +213,7 @@ def test_openhab_price_sensor_failure_keeps_last_value(default_config):
     test_config.update(
         {
             "url": "http://fake",
-            "price_euro_per_wh_source": "openhab",
+            "source": "openhab",
             "price_euro_per_wh_sensor": "BatteryPrice",
             "price_euro_per_wh_accu": 0.0001,
         }

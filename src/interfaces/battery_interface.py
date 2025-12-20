@@ -78,7 +78,6 @@ class BatteryInterface:
         self.min_soc_set = config.get("min_soc_percentage", 0)
         self.max_soc_set = config.get("max_soc_percentage", 100)
         self.price_euro_per_wh = float(config.get("price_euro_per_wh_accu", 0.0))
-        self.price_source = config.get("price_euro_per_wh_source", "config")
         self.price_sensor = config.get("price_euro_per_wh_sensor", "")
 
         self.soc_fail_count = 0
@@ -88,86 +87,7 @@ class BatteryInterface:
         self._stop_event = threading.Event()
         self.start_update_service()
 
-    def __fetch_soc_data_from_openhab(self):
-        """
-        Fetches the State of Charge (SOC) data for the battery from the OpenHAB server.
-
-        This method sends a GET request to the OpenHAB REST API to retrieve the SOC value
-        for the battery. If the request is successful, the SOC value is extracted, converted
-        to a percentage, and returned. In case of a timeout or request failure, a default
-        SOC value of 5% is returned, and an error is logged.
-
-        Returns:
-            int: The SOC value as a percentage (0-100). Defaults to 5% in case of an error.
-        """
-        logger.debug("[BATTERY-IF] getting SOC from openhab ...")
-        openhab_url = self.url + "/rest/items/" + self.soc_sensor
-        soc = 5  # Default SOC value in case of error
-        try:
-            response = requests.get(openhab_url, timeout=6)
-            response.raise_for_status()
-            data = response.json()
-            raw_state = str(data["state"]).strip()
-            # Take only the first part before any space (handles "90", "90 %", "0.11 %", etc.)
-            cleaned_value = raw_state.split()[0]
-            raw_value = float(cleaned_value)
-
-            # Auto-detect format: if value is <= 1.0, assume it's decimal (0.0-1.0)
-            # if value is > 1.0, assume it's already percentage (0-100)
-            if raw_value <= 1.0:
-                soc = raw_value * 100  # Convert decimal to percentage
-                logger.debug(
-                    "[BATTERY-IF] Detected decimal format (0.0-1.0): %s -> %s%%",
-                    raw_value,
-                    soc,
-                )
-            else:
-                soc = raw_value  # Already in percentage format
-                logger.debug(
-                    "[BATTERY-IF] Detected percentage format (0-100): %s%%", soc
-                )
-            self.soc_fail_count = 0  # Reset fail count on success
-            return round(soc, 1)
-        except requests.exceptions.Timeout:
-            return self._handle_soc_error(
-                "openhab", "Request timed out", self.current_soc
-            )
-        except requests.exceptions.RequestException as e:
-            return self._handle_soc_error("openhab", e, self.current_soc)
-
-    def __fetch_soc_data_from_homeassistant(self):
-        """
-        Fetches the state of charge (SOC) data from the Home Assistant API.
-        This method sends a GET request to the Home Assistant API to retrieve the SOC
-        value for a specific sensor. The SOC value is expected to be in the 'state' field
-        of the API response and is converted to a percentage.
-        Returns:
-            int: The SOC value as a percentage, rounded to the nearest integer.
-                 Returns a default value of 5% in case of a timeout or request failure.
-        Raises:
-            requests.exceptions.Timeout: If the request to the Home Assistant API times out.
-            requests.exceptions.RequestException: If there is an error during the request.
-        """
-        homeassistant_url = f"{self.url}/api/states/{self.soc_sensor}"
-        # Headers for the API request
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-        soc = 5  # Default SOC value in case of error
-        try:
-            response = requests.get(homeassistant_url, headers=headers, timeout=6)
-            response.raise_for_status()
-            entity_data = response.json()
-            soc = float(entity_data["state"])
-            self.soc_fail_count = 0  # Reset fail count on success
-            return round(soc, 1)
-        except requests.exceptions.Timeout:
-            return self._handle_soc_error(
-                "homeassistant", "Request timed out", self.current_soc
-            )
-        except requests.exceptions.RequestException as e:
-            return self._handle_soc_error("homeassistant", e, self.current_soc)
+    # source-specific SOC fetchers removed — use __fetch_soc_data_unified
 
     def __battery_request_current_soc(self):
         """
@@ -179,98 +99,115 @@ class BatteryInterface:
             self.current_soc = 5
             default = True
             logger.debug("[BATTERY-IF] source set to default with start SOC = 5%")
-        elif self.src == "openhab":
-            self.current_soc = self.__fetch_soc_data_from_openhab()
-        elif self.src == "homeassistant":
-            self.current_soc = self.__fetch_soc_data_from_homeassistant()
         else:
-            self.current_soc = 5
-            default = True
-            logger.error(
-                "[BATTERY-IF] source currently not supported. Using default start SOC = 5%."
-            )
+            try:
+                self.current_soc = self.__fetch_soc_data_unified()
+            except ValueError:
+                # Unknown/invalid source -> fallback to default behavior
+                self.current_soc = 5
+                default = True
+                logger.error(
+                    "[BATTERY-IF] source currently not supported. Using default start SOC = 5%."
+                )
         if default is False:
             logger.debug(
                 "[BATTERY-IF] successfully fetched SOC = %s %%", self.current_soc
             )
         return self.current_soc
 
-    def __fetch_price_data_from_openhab(self):
-        """
-        Fetch the current battery energy price from an OpenHAB item.
+    # source-specific price fetchers removed — use __fetch_price_data_unified
 
-        Returns:
-            float: Battery energy cost in €/Wh provided by the configured item.
-        """
-        if not self.price_sensor:
-            raise ValueError("price_euro_per_wh_sensor must be configured for OpenHAB.")
+    def __fetch_remote_state(self, source, sensor):
+        """Fetch the raw state string from OpenHAB or Home Assistant.
 
-        logger.debug("[BATTERY-IF] getting price from openhab ...")
-        openhab_url = self.url + "/rest/items/" + self.price_sensor
-        try:
-            response = requests.get(openhab_url, timeout=6)
+        Returns the trimmed state string. Raises the original requests
+        exceptions for callers to handle.
+        """
+        if not sensor:
+            raise ValueError("Sensor/item identifier must be provided")
+
+        if source == "openhab":
+            url = self.url + "/rest/items/" + sensor
+            response = requests.get(url, timeout=6)
             response.raise_for_status()
             data = response.json()
-            raw_state = str(data["state"]).strip()
-            # Take only the first part before any space (handles "0.0001", "0.0001 €/Wh", etc.)
+            return str(data.get("state", "")).strip()
+        elif source == "homeassistant":
+            url = f"{self.url}/api/states/{sensor}"
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers, timeout=6)
+            response.raise_for_status()
+            data = response.json()
+            return str(data.get("state", "")).strip()
+        else:
+            raise ValueError(f"Unknown source: {source}")
+
+    def __fetch_soc_data_unified(self):
+        """Unified SOC fetch using the configured `self.src` source."""
+        try:
+            raw_state = self.__fetch_remote_state(self.src, self.soc_sensor)
             cleaned_value = raw_state.split()[0]
-            price = float(cleaned_value)
-            logger.debug("[BATTERY-IF] Fetched price from OpenHAB: %s €/Wh", price)
-            return price
+            raw_value = float(cleaned_value)
+            if raw_value <= 1.0:
+                soc = raw_value * 100
+                logger.debug(
+                    "[BATTERY-IF] Detected decimal format (0.0-1.0): %s -> %s%%",
+                    raw_value,
+                    soc,
+                )
+            else:
+                soc = raw_value
+                logger.debug(
+                    "[BATTERY-IF] Detected percentage format (0-100): %s%%", soc
+                )
+            self.soc_fail_count = 0
+            return round(soc, 1)
         except requests.exceptions.Timeout:
-            raise requests.exceptions.Timeout(
-                "Request timed out while fetching price from OpenHAB"
+            return self._handle_soc_error(
+                self.src, "Request timed out", self.current_soc
             )
         except requests.exceptions.RequestException as e:
-            raise requests.exceptions.RequestException(
-                f"Error fetching price from OpenHAB: {e}"
-            )
+            return self._handle_soc_error(self.src, e, self.current_soc)
+        except (ValueError, KeyError) as e:
+            return self._handle_soc_error(self.src, e, self.current_soc)
 
-    def __fetch_price_data_from_homeassistant(self):
-        """
-        Fetch the current battery energy price from a Home Assistant sensor.
-
-        Returns:
-            float: Battery energy cost in €/Wh provided by the configured sensor.
-        """
+    def __fetch_price_data_unified(self):
+        """Unified price fetch using configured `self.src` (top-level source)."""
+        # If no sensor is configured, fall back to the static configured price
         if not self.price_sensor:
-            raise ValueError(
-                "price_euro_per_wh_sensor must be configured for Home Assistant."
-            )
+            return self.price_euro_per_wh
 
-        logger.debug("[BATTERY-IF] getting price from homeassistant ...")
-        homeassistant_url = f"{self.url}/api/states/{self.price_sensor}"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-        response = requests.get(homeassistant_url, headers=headers, timeout=6)
-        response.raise_for_status()
-        entity_data = response.json()
-        price = float(entity_data["state"])
-        logger.debug("[BATTERY-IF] Fetched price from Home Assistant: %s €/Wh", price)
-        return price
+        # Use top-level `source` for all remote fetches (SOC and price)
+        raw_state = self.__fetch_remote_state(self.src, self.price_sensor)
+        cleaned_value = raw_state.split()[0]
+        return float(cleaned_value)
 
     def __update_price_euro_per_wh(self):
         """
         Update the battery price from the configured source if needed.
         """
-        if self.price_source == "config":
+        # If top-level source is default, keep configured static price
+        if self.src == "default":
             return self.price_euro_per_wh
 
-        source_name = self.price_source.upper()
+        # If no sensor configured, use static configured price
+        if not self.price_sensor:
+            return self.price_euro_per_wh
+
+        source_name = self.src.upper()
+        if self.src not in ("homeassistant", "openhab"):
+            logger.warning(
+                "[BATTERY-IF] Unknown price source '%s'. Keeping last value %s.",
+                self.src,
+                self.price_euro_per_wh,
+            )
+            return self.price_euro_per_wh
+
         try:
-            if self.price_source == "homeassistant":
-                latest_price = self.__fetch_price_data_from_homeassistant()
-            elif self.price_source == "openhab":
-                latest_price = self.__fetch_price_data_from_openhab()
-            else:
-                logger.warning(
-                    "[BATTERY-IF] Unknown price source '%s'. Keeping last value %s.",
-                    self.price_source,
-                    self.price_euro_per_wh,
-                )
-                return self.price_euro_per_wh
+            latest_price = self.__fetch_price_data_unified()
         except requests.exceptions.Timeout:
             logger.warning(
                 "[BATTERY-IF] %s - Request timed out while fetching "
@@ -292,7 +229,7 @@ class BatteryInterface:
         self.price_euro_per_wh = latest_price
         logger.debug(
             "[BATTERY-IF] Updated price_euro_per_wh_accu from %s sensor %s: %s",
-            self.price_source,
+            self.src,
             self.price_sensor,
             self.price_euro_per_wh,
         )

@@ -197,20 +197,12 @@ A default config file will be created with the first start, if there is no `conf
 - **`battery.max_soc_percentage`**:  
   Maximum state of charge for the battery, as a percentage.
 
-- **`price_euro_per_wh_accu`**:
+- **`battery.price_euro_per_wh_accu`**:
   Price for battery in €/Wh - can be used to shift the result over the day according to the available energy (more details follow).
 
-- **`battery.price_euro_per_wh_source`**:  
-  Determines where the battery energy cost should be read from.  
-  - `config` *(default)*: Use the static `price_euro_per_wh_accu` value.  
-  - `homeassistant`: Fetch the price from a Home Assistant entity defined via `battery.price_euro_per_wh_sensor`. Requires `battery.url` and `battery.access_token`.  
-  - `openhab`: Fetch the price from an OpenHAB item defined via `battery.price_euro_per_wh_sensor`. Requires `battery.url`.
 
-- **`battery.price_euro_per_wh_sensor`**:  
-  Sensor/item identifier that exposes the battery price in €/Wh.  
-  - For Home Assistant: Entity ID (e.g., `sensor.battery_price`).  
-  - For OpenHAB: Item name (e.g., `BatteryPrice`).  
-  Only used when `battery.price_euro_per_wh_source` is set to `homeassistant` or `openhab`.
+ - **`battery.price_euro_per_wh_sensor`**:  
+   Sensor/item identifier that exposes the battery price in €/Wh. If `battery.source` is set to `homeassistant` or `openhab` and a sensor/item is configured here, the system will fetch the value from that sensor/item. If no sensor is configured, the static value at `price_euro_per_wh_accu` will be used. For Home Assistant use an entity ID (e.g., `sensor.battery_price`); for OpenHAB use an item name (e.g., `BatteryPrice`).
 
 - **`battery.charging_curve_enabled`**:  
   Enables or disables the dynamic charging curve for the battery.  
@@ -483,7 +475,6 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
-  price_euro_per_wh_source: config # use static config value or fetch from homeassistant
   price_euro_per_wh_sensor: "" # Home Assistant entity (e.g. sensor.battery_price) providing €/Wh
   charging_curve_enabled: true # enable dynamic charging curve for battery
 # List of PV forecast source configuration
@@ -562,7 +553,6 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
-  price_euro_per_wh_source: config # use static config value or fetch from homeassistant
   charging_curve_enabled: true # enable dynamic charging curve for battery
 # List of PV forecast source configuration
 pv_forecast_source:
