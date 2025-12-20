@@ -189,6 +189,12 @@ class EVOptBackend:
         price_series = ems.get("strompreis_euro_pro_wh", []) or []
         feed_series = ems.get("einspeiseverguetung_euro_pro_wh", []) or []
         load_series = ems.get("gesamtlast", []) or []
+        # price for energy currently stored in the accu (EUR/Wh) - be defensive
+        price_accu_wh_raw = ems.get("preis_euro_pro_wh_akku", 0.0)
+        try:
+            price_accu_wh = float(price_accu_wh_raw)
+        except (TypeError, ValueError):
+            price_accu_wh = 0.0
 
         now = datetime.now(self.time_zone)
         if self.time_frame_base == 900:
@@ -298,7 +304,7 @@ class EVOptBackend:
                     "c_min": 0.0,
                     "c_max": batt_c_max,
                     "d_max": batt_c_max,
-                    "p_a": 0.0,
+                    "p_a": price_accu_wh,
                 }
             )
 
