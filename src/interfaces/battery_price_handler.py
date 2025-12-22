@@ -126,7 +126,7 @@ class BatteryPriceHandler:
                 raise ValueError("Access token is required for Home Assistant")
 
     def calculate_battery_price_from_history(
-        self, lookback_hours: Optional[int] = None
+        self, lookback_hours: Optional[int] = None, inventory_wh: Optional[float] = None
     ) -> Optional[float]:
         """
         Calculate battery price by analyzing historical charging data.
@@ -135,15 +135,15 @@ class BatteryPriceHandler:
         1. Fetches battery power history for the lookback period.
         2. Identifies "charging events" where battery power > threshold.
         3. For each event, fetches aligned PV, Grid, and Load power data.
-        4. Splits the charging energy into PV-sourced and Grid-sourced:
-           - PV surplus = max(0, PV - Load)
-           - PV to Battery = min(Battery_Power, PV surplus)
-           - Grid to Battery = max(0, Battery_Power - PV to Battery)
-        5. Multiplies grid energy by the electricity price at that specific time.
-        6. Sums total costs and total energy to find the weighted average.
+        4. Splits the charging energy into PV-sourced and Grid-sourced.
+        5. Calculates costs per event.
+        6. If inventory_wh is provided, it uses an "inventory" approach:
+           - It goes backwards through sessions until the inventory_wh is reached.
+           - This ensures the price reflects the energy actually stored.
 
         Args:
             lookback_hours: Hours of history to analyze (overrides config)
+            inventory_wh: Current energy stored in battery (Wh) to use for inventory calculation
 
         Returns:
             Weighted average price in €/Wh, or None if calculation failed
@@ -153,8 +153,9 @@ class BatteryPriceHandler:
 
         try:
             logger.info(
-                "[BATTERY-PRICE] Starting historical analysis (%sh lookback)",
+                "[BATTERY-PRICE] Starting historical analysis (%sh lookback, Inventory: %s Wh)",
                 lookback_hours,
+                round(inventory_wh, 1) if inventory_wh is not None else "N/A",
             )
 
             # Fetch historical data (Step 1: Battery Power only)
@@ -193,7 +194,7 @@ class BatteryPriceHandler:
 
             # Calculate costs per event
             results = self._calculate_total_costs(
-                charging_events, historical_data, lookback_hours
+                charging_events, historical_data, lookback_hours, inventory_wh
             )
 
             total_cost = results["total_cost"]
@@ -235,7 +236,11 @@ class BatteryPriceHandler:
 
     # pylint: disable=too-many-locals
     def _calculate_total_costs(
-        self, charging_events: List[Dict], historical_data: Dict, lookback_hours: int
+        self,
+        charging_events: List[Dict],
+        historical_data: Dict,
+        lookback_hours: int,
+        inventory_wh: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Calculate total cost and energy from all charging events."""
         total_cost = 0.0
@@ -249,6 +254,8 @@ class BatteryPriceHandler:
         )
         active_window_start = now_tz - timedelta(hours=lookback_hours)
 
+        # First, calculate all sessions in the window
+        all_sessions_data = []
         for i, event in enumerate(charging_events):
             # Skip events that end before our active window
             if event["end_time"] < active_window_start:
@@ -266,38 +273,80 @@ class BatteryPriceHandler:
             # Apply efficiency to the cost
             event_cost = event_totals["grid_cost_euro"] / self.charge_efficiency
 
-            total_cost += event_cost
-            total_energy_charged += battery_in_wh
-            total_pv_energy += energy_from_pv
-            total_grid_energy += energy_from_grid
-
-            sessions.append(
+            all_sessions_data.append(
                 {
-                    "start_time": event["start_time"].isoformat(),
-                    "end_time": event["end_time"].isoformat(),
-                    "charged_energy": round(battery_in_wh, 1),
-                    "charged_from_pv": round(energy_from_pv, 1),
-                    "charged_from_grid": round(energy_from_grid, 1),
-                    "ratio": (
-                        round(energy_from_pv / battery_in_wh * 100, 1)
-                        if battery_in_wh > 0
-                        else 0
-                    ),
-                    "cost": round(event_cost, 4),
+                    "start_time": event["start_time"],
+                    "end_time": event["end_time"],
+                    "charged_energy": battery_in_wh,
+                    "charged_from_pv": energy_from_pv,
+                    "charged_from_grid": energy_from_grid,
+                    "cost": event_cost,
+                    "is_inventory": False,
+                    "inventory_energy": 0.0,
                 }
             )
 
-            logger.debug(
-                "[BATTERY-PRICE] Event %s: %s - %s | "
-                "Bat In: %.1fWh | PV %.1fWh, Grid %.1fWh | "
-                "Price: %.4f€/kWh",
-                i + 1,
-                self._localize_time(event["start_time"]),
-                self._localize_time(event["end_time"]),
-                battery_in_wh,
-                energy_from_pv,
-                energy_from_grid,
-                (event_cost / battery_in_wh * 1000) if battery_in_wh > 0 else 0,
+        # Inventory approach: walk backwards from most recent session
+        accumulated_inventory = 0.0
+
+        # Sort sessions by end_time descending (most recent first)
+        all_sessions_data.sort(key=lambda x: x["end_time"], reverse=True)
+
+        for session in all_sessions_data:
+            if inventory_wh is not None and accumulated_inventory < inventory_wh:
+                remaining_needed = inventory_wh - accumulated_inventory
+                session_energy = session["charged_energy"]
+
+                session["is_inventory"] = True
+                if session_energy <= remaining_needed:
+                    # Full session is part of inventory
+                    session["inventory_energy"] = session_energy
+                    accumulated_inventory += session_energy
+                else:
+                    # Partial session is part of inventory
+                    session["inventory_energy"] = remaining_needed
+                    accumulated_inventory = inventory_wh
+
+            # Final aggregation for the price (only use inventory if inventory_wh provided)
+            if inventory_wh is None or session["is_inventory"]:
+                # If inventory mode, we only use the inventory_energy part for the price
+                energy_to_use = (
+                    session["inventory_energy"]
+                    if inventory_wh is not None
+                    else session["charged_energy"]
+                )
+                ratio = energy_to_use / session["charged_energy"]
+
+                total_cost += session["cost"] * ratio
+                total_energy_charged += energy_to_use
+                total_pv_energy += session["charged_from_pv"] * ratio
+                total_grid_energy += session["charged_from_grid"] * ratio
+
+        # Prepare sessions for output (sort back to chronological)
+        all_sessions_data.sort(key=lambda x: x["start_time"])
+
+        for session in all_sessions_data:
+            sessions.append(
+                {
+                    "start_time": session["start_time"].isoformat(),
+                    "end_time": session["end_time"].isoformat(),
+                    "charged_energy": round(session["charged_energy"], 1),
+                    "charged_from_pv": round(session["charged_from_pv"], 1),
+                    "charged_from_grid": round(session["charged_from_grid"], 1),
+                    "ratio": (
+                        round(
+                            session["charged_from_pv"]
+                            / session["charged_energy"]
+                            * 100,
+                            1,
+                        )
+                        if session["charged_energy"] > 0
+                        else 0
+                    ),
+                    "cost": round(session["cost"], 4),
+                    "is_inventory": session["is_inventory"],
+                    "inventory_energy": round(session["inventory_energy"], 1),
+                }
             )
 
         pv_ratio = (
@@ -334,12 +383,12 @@ class BatteryPriceHandler:
         time_since_last = (now - self.last_price_calculation).total_seconds()
         return time_since_last >= self.price_update_interval
 
-    def update_price_if_needed(self) -> bool:
+    def update_price_if_needed(self, inventory_wh: Optional[float] = None) -> bool:
         """Update price if the update interval has passed."""
         if not self.should_update_price():
             return False
 
-        new_price = self.calculate_battery_price_from_history()
+        new_price = self.calculate_battery_price_from_history(inventory_wh=inventory_wh)
         if new_price is not None:
             self.price_euro_per_wh = new_price
             self.last_price_calculation = (
@@ -630,12 +679,6 @@ class BatteryPriceHandler:
             pv_to_battery += remaining_battery
 
         return pv_to_battery, grid_to_battery
-
-    def _calculate_circulating_energy(self, current_soc: float) -> float:
-        """Calculate current circulating energy in the battery."""
-        min_soc = self.min_soc_percentage
-        circulating_soc = max(0, current_soc - min_soc)
-        return self.capacity_wh * (circulating_soc / 100)
 
     def _get_fallback_price(self, timestamp: datetime) -> float:
         """Get fallback price when historical data is not available."""

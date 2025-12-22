@@ -252,13 +252,14 @@ A default config file will be created with the first start, if there is no `conf
 
 #### Dynamic Battery Price Calculation
 
-When `price_calculation_enabled` is set to `true`, the system performs a detailed analysis of your battery's charging history to determine the Weighted Average Cost (WAC) of the energy currently stored.
+When `price_calculation_enabled` is set to `true`, the system performs a detailed analysis of your battery's charging history to determine the real cost of the energy currently stored.
 
 **How it works:**
 1. **Event Detection:** The system scans historical data (default 48h) to identify "charging events" where the battery power was above the `charging_threshold_w`.
 2. **Source Attribution:** For each event, it compares battery power with PV production and Grid import. If grid import is significant (above `grid_charge_threshold_w`), the energy is attributed to the grid at the current market price. Otherwise, it is attributed to PV surplus at the `feed_in_price` (opportunity cost).
-3. **WAC Calculation:** The total cost of all energy charged into the battery is divided by the total energy charged. This resulting price is then used by the optimizer to decide when it is profitable to discharge the battery.
-4. **Efficiency:** To minimize API load, the system uses a two-step fetching strategy: it first fetches low-resolution data to find events, and then high-resolution data only for the specific periods when the battery was actually charging.
+3. **Inventory Valuation (LIFO):** Instead of a simple average, the system uses a **Last-In, First-Out** model. It looks at the most recent charging sessions that match your current battery level. This ensures the price reflects the actual "value" of the energy currently inside the battery.
+4. **Optimizer Integration:** This resulting price is used by the optimizer to decide when it is profitable to discharge the battery.
+5. **Efficiency:** To minimize API load, the system uses a two-step fetching strategy: it first fetches low-resolution data to find events, and then high-resolution data only for the specific periods when the battery was actually charging.
 
 ---
 

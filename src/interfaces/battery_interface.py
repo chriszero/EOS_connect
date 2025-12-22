@@ -199,7 +199,9 @@ class BatteryInterface:
         """
         # If dynamic price calculation is enabled, use the handler
         if self.price_handler and self.price_handler.price_calculation_enabled:
-            if self.price_handler.update_price_if_needed():
+            if self.price_handler.update_price_if_needed(
+                inventory_wh=self.current_usable_capacity
+            ):
                 self.price_euro_per_wh = self.price_handler.get_current_price()
                 logger.info(
                     "[BATTERY-IF] Dynamic battery price updated: %.4f €/kWh",

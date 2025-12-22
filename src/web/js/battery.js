@@ -66,9 +66,9 @@ class BatteryManager {
                         <div class="sub-label">Dynamic limit</div>
                     </div>
                     <div class="battery-stat-card" style="border-left: 4px solid #2196f3;">
-                        <div class="label">Energy Cost (WAC)</div>
+                        <div class="label">Stored Energy Price</div>
                         <div class="value">${wac} <span style="font-size: 0.6em;">ct/kWh</span></div>
-                        <div class="sub-label">Weighted average</div>
+                        <div class="sub-label">Inventory Valuation</div>
                     </div>
                     <div class="battery-stat-card" style="border-left: 4px solid #4caf50;">
                         <div class="label">PV Share</div>
@@ -119,13 +119,31 @@ class BatteryManager {
                                             durationStr = (diffSec / 3600).toFixed(1) + ' h';
                                         }
                                         const isGridHeavy = s.ratio < 50;
-                                        const rowStyle = isGridHeavy ? `color: ${COLOR_MODE_CHARGE_FROM_GRID};` : '';
+                                        const isInventory = s.is_inventory;
+                                        const inventoryEnergy = s.inventory_energy || 0;
                                         
+                                        let rowStyle = isGridHeavy ? `color: ${COLOR_MODE_CHARGE_FROM_GRID};` : '';
+                                        if (isInventory) {
+                                            rowStyle += 'background-color: rgba(76, 175, 80, 0.05); border-left: 3px solid #4caf50;';
+                                        } else {
+                                            rowStyle += 'opacity: 0.5;';
+                                        }
+                                        
+                                        const inventoryInfo = isInventory && inventoryEnergy < s.charged_energy 
+                                            ? `<div style="font-size: 0.8em; color: #4caf50;">Stored: ${(inventoryEnergy/1000).toFixed(3)}</div>` 
+                                            : '';
+
                                         return `
                                         <tr style="border-bottom: 1px solid #333; ${rowStyle}">
-                                            <td style="padding: 8px 5px;">${start.toLocaleDateString()} ${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}</td>
+                                            <td style="padding: 8px 5px;">
+                                                ${start.toLocaleDateString()} ${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}
+                                                ${isInventory ? ' <i class="fa-solid fa-box-archive" title="In Inventory" style="font-size: 0.8em; color: #4caf50;"></i>' : ''}
+                                            </td>
                                             <td style="text-align: right; padding: 8px 5px;">${durationStr}</td>
-                                            <td style="text-align: right; padding: 8px 5px; font-weight: bold;">${(s.charged_energy / 1000).toFixed(3)}</td>
+                                            <td style="text-align: right; padding: 8px 5px; font-weight: bold;">
+                                                ${(s.charged_energy / 1000).toFixed(3)}
+                                                ${inventoryInfo}
+                                            </td>
                                             <td style="text-align: right; padding: 8px 5px;">${(s.charged_from_pv / 1000).toFixed(3)}</td>
                                             <td style="text-align: right; padding: 8px 5px;">${(s.charged_from_grid / 1000).toFixed(3)}</td>
                                             <td style="text-align: right; padding: 8px 5px;">${s.cost.toFixed(2)} ${localization.currency_symbol}</td>
@@ -151,16 +169,51 @@ class BatteryManager {
      * Render the charging sessions chart
      */
     renderSessionsChart(sessions) {
-        const ctx = document.getElementById('batterySessionsChart').getContext('2d');
+        const canvas = document.getElementById('batterySessionsChart');
+        const ctx = canvas.getContext('2d');
         
+        // Create hatched patterns for historical data
+        const createPattern = (color) => {
+            const pCanvas = document.createElement('canvas');
+            const pCtx = pCanvas.getContext('2d');
+            pCanvas.width = 10;
+            pCanvas.height = 10;
+            pCtx.strokeStyle = color;
+            pCtx.lineWidth = 1;
+            pCtx.beginPath();
+            pCtx.moveTo(0, 10);
+            pCtx.lineTo(10, 0);
+            pCtx.stroke();
+            return ctx.createPattern(pCanvas, 'repeat');
+        };
+
+        const pvPattern = createPattern('rgba(76, 175, 80, 0.4)');
+        const gridPattern = createPattern('rgba(33, 150, 243, 0.4)');
+
         // Prepare data
         const labels = sessions.map(s => {
             const d = new Date(s.start_time);
             return `${d.getDate()}.${d.getMonth()+1} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         });
         
-        const pvData = sessions.map(s => s.charged_from_pv / 1000);
-        const gridData = sessions.map(s => s.charged_from_grid / 1000);
+        // Split data into Inventory and Historical parts
+        const pvInventory = [];
+        const pvHistorical = [];
+        const gridInventory = [];
+        const gridHistorical = [];
+
+        sessions.forEach(s => {
+            const total = s.charged_energy || 1;
+            const inv = s.inventory_energy || 0;
+            const hist = s.charged_energy - inv;
+            const pvRatio = s.charged_from_pv / total;
+            const gridRatio = s.charged_from_grid / total;
+
+            pvInventory.push((inv * pvRatio) / 1000);
+            pvHistorical.push((hist * pvRatio) / 1000);
+            gridInventory.push((inv * gridRatio) / 1000);
+            gridHistorical.push((hist * gridRatio) / 1000);
+        });
 
         const mobile = isMobile();
         const fontSize = mobile ? 9 : 12;
@@ -172,15 +225,27 @@ class BatteryManager {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'PV Energy (kWh)',
-                        data: pvData,
+                        label: 'PV (Inventory)',
+                        data: pvInventory,
                         backgroundColor: '#4caf50',
                         stack: 'Stack 0',
                     },
                     {
-                        label: 'Grid Energy (kWh)',
-                        data: gridData,
+                        label: 'PV (Historical)',
+                        data: pvHistorical,
+                        backgroundColor: pvPattern,
+                        stack: 'Stack 0',
+                    },
+                    {
+                        label: 'Grid (Inventory)',
+                        data: gridInventory,
                         backgroundColor: '#2196f3',
+                        stack: 'Stack 0',
+                    },
+                    {
+                        label: 'Grid (Historical)',
+                        data: gridHistorical,
+                        backgroundColor: gridPattern,
                         stack: 'Stack 0',
                     }
                 ]
@@ -190,17 +255,29 @@ class BatteryManager {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: window.innerWidth > 400,
+                        display: window.innerWidth > 600,
                         position: 'top',
                         labels: { 
                             color: '#ccc',
                             font: { size: fontSize },
-                            boxWidth: mobile ? 10 : 40
+                            boxWidth: mobile ? 10 : 20,
+                            // Filter legend to show only main categories
+                            filter: (item) => !item.text.includes('Historical')
                         }
                     },
                     tooltip: {
                         mode: 'index',
-                        intersect: false
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== undefined) {
+                                    label += context.parsed.y.toFixed(3) + ' kWh';
+                                }
+                                return label;
+                            }
+                        }
                     }
                 },
                 scales: {

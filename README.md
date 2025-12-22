@@ -85,8 +85,9 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
   - **Dynamic Charging Curve**:
     - If enabled, EOS Connect automatically adjusts the maximum battery charging power based on the current state of charge (SOC). This helps to optimize battery health and efficiency by reducing charge power as the battery approaches full capacity.
 - **Dynamic Battery Price Calculation**:
-  - Analyzes historical charging data to determine the real cost of energy stored in the battery.
-  - Distinguishes between PV surplus and grid charging to provide an accurate weighted average price.
+  - Analyzes charging history to determine the real cost of energy currently stored in the battery.
+  - Uses an **Inventory Valuation (LIFO)** model to ensure the price reflects the most recent charging sessions.
+  - Distinguishes between PV surplus and grid charging to provide an accurate cost basis.
   - Helps the optimizer make better decisions about when to discharge the battery based on the actual cost of the stored energy.
 - **Cost and Solar Optimization**:
   - Aligns energy usage with real-time electricity prices (e.g., from Tibber, [smartenergy.at](https://www.smartenergy.at/), or [Stromligning.dk](https://stromligning.dk/)) to minimize costs.
@@ -311,12 +312,12 @@ EOS Connect supports multiple sources for solar (PV) production forecasts. You c
 #### Energy Price Forecast
 Energy price forecasts are retrieved from the chosen source (e.g. tibber, Akkudoktor, Smartenergy, ...). **Note**: Prices for tomorrow are available earliest at 1 PM. Until then, today's prices are used to feed the model.
 
-#### Battery Price Analysis (Historical Cost)
-EOS Connect calculates the actual cost of the energy in your battery by looking at your charging history from the last 96 hours. Instead of a fixed estimate, it uses a **Weighted Average Cost (WAC)**:
+#### Battery Price Analysis (Inventory Valuation)
+EOS Connect calculates the actual cost of the energy currently stored in your battery by analyzing your recent charging history. Instead of a simple average, it uses an **Inventory Valuation (LIFO)** model:
 - **Smart Tracking**: It automatically identifies if energy came from your solar panels (0€) or the grid.
+- **Inventory Focus**: It calculates the price based on the most recent charging sessions that match your current battery level. This means the price reflects the "value" of the energy actually inside the battery.
 - **Live Pricing**: For grid charging, it uses the exact electricity price at that time.
-- **Session History**: Shows you exactly when, how long, and at what cost your battery was charged.
-- **Easy Visualization**: A dedicated "Battery Overview" dashboard shows all these details in simple charts and tables.
+- **Visual Feedback**: The dashboard highlights which charging sessions are currently "in inventory" and which are historical.
 
 > **Note:**  
 > All data collection, forecasting, and optimization cycles are now driven by the `time_frame` setting in your configuration.  
