@@ -252,7 +252,7 @@ A default config file will be created with the first start, if there is no `conf
 
 #### Dynamic Battery Price Calculation
 
-When `price_calculation_enabled` is set to `true`, the system performs a "forensic" analysis of your battery's charging history to determine the Weighted Average Cost (WAC) of the energy currently stored.
+When `price_calculation_enabled` is set to `true`, the system performs a detailed analysis of your battery's charging history to determine the Weighted Average Cost (WAC) of the energy currently stored.
 
 **How it works:**
 1. **Event Detection:** The system scans historical data (default 48h) to identify "charging events" where the battery power was above the `charging_threshold_w`.
