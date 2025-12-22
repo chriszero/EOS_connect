@@ -40,7 +40,7 @@ import logging
 import threading
 import time
 import requests
-from interfaces.battery_price_handler import BatteryPriceHandler
+from .battery_price_handler import BatteryPriceHandler
 
 logger = logging.getLogger("__main__")
 logger.info("[BATTERY-IF] loading module ")
