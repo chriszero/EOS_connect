@@ -88,9 +88,19 @@ class ConfigManager:
                         "max_charge_power_w": 5000,
                         "min_soc_percentage": 5,
                         "max_soc_percentage": 100,
+                        "charging_curve_enabled": True,  # enable charging curve
                         "price_euro_per_wh_accu": 0.0,  # price for battery in euro/Wh
                         "price_euro_per_wh_sensor": "",  # sensor/item providing battery energy cost in €/Wh
-                        "charging_curve_enabled": True,  # enable charging curve
+                        "price_calculation_enabled": False,
+                        "price_update_interval": 900,
+                        "price_history_lookback_hours": 96,
+                        "battery_power_sensor": "",
+                        "pv_power_sensor": "",
+                        "grid_power_sensor": "",
+                        "load_power_sensor": "",
+                        "price_sensor": "",
+                        "charging_threshold_w": 50.0,
+                        "grid_charge_threshold_w": 100.0,
                     }
                 ),
                 "pv_forecast_source": CommentedMap(
@@ -290,6 +300,43 @@ class ConfigManager:
             "enabling charging curve for controlled charging power"
             + " according to the SOC (default: true)",
             "charging_curve_enabled",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "enable dynamic battery price calculation based on history",
+            "price_calculation_enabled",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "interval for price update in seconds - default: 900 (15 min)",
+            "price_update_interval",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "hours of history to analyze for price calculation - default: 96",
+            "price_history_lookback_hours",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "HA entity ID or OpenHAB item for battery power in W (positive = charging)",
+            "battery_power_sensor",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "HA entity ID or OpenHAB item for PV power in W", "pv_power_sensor"
+        )
+        config["battery"].yaml_add_eol_comment(
+            "HA entity ID or OpenHAB item for grid power in W (positive = import)",
+            "grid_power_sensor",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "HA entity ID or OpenHAB item for load power in W", "load_power_sensor"
+        )
+        config["battery"].yaml_add_eol_comment(
+            "HA entity ID or OpenHAB item for electricity price in €/kWh or ct/kWh",
+            "price_sensor",
+        )
+        config["battery"].yaml_add_eol_comment(
+            "minimum battery power to consider as charging (W)", "charging_threshold_w"
+        )
+        config["battery"].yaml_add_eol_comment(
+            "minimum grid surplus to consider as grid charging (W)",
+            "grid_charge_threshold_w",
         )
 
         # pv forecast source configuration

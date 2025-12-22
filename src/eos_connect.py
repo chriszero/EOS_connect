@@ -343,6 +343,8 @@ load_interface = LoadInterface(
 battery_interface = BatteryInterface(
     config_manager.config["battery"],
     on_bat_max_changed=None,
+    load_interface=load_interface,
+    timezone=time_zone,
 )
 
 price_interface = PriceInterface(
@@ -1496,6 +1498,7 @@ def get_controls():
             "max_grid_charge_rate": config_manager.config["inverter"][
                 "max_grid_charge_rate"
             ],
+            "stored_energy": battery_interface.get_stored_energy_info(),
         },
         "inverter": {
             "inverter_special_data": (

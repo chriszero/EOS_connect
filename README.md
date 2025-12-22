@@ -83,6 +83,10 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
     - EVCC-specific modes (e.g., fast charge, PV mode).
   - **Dynamic Charging Curve**:
     - If enabled, EOS Connect automatically adjusts the maximum battery charging power based on the current state of charge (SOC). This helps to optimize battery health and efficiency by reducing charge power as the battery approaches full capacity.
+- **Dynamic Battery Price Calculation**:
+  - Analyzes historical charging data to determine the real cost of energy stored in the battery.
+  - Distinguishes between PV surplus and grid charging to provide an accurate weighted average price.
+  - Helps the optimizer make better decisions about when to discharge the battery based on the actual cost of the stored energy.
 - **Cost and Solar Optimization**:
   - Aligns energy usage with real-time electricity prices (e.g., from Tibber, [smartenergy.at](https://www.smartenergy.at/), or [Stromligning.dk](https://stromligning.dk/)) to minimize costs.
   - Incorporates PV forecasts to prioritize charging during periods of high solar output.

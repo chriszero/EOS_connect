@@ -40,6 +40,7 @@ import logging
 import threading
 import time
 import requests
+from interfaces.battery_price_handler import BatteryPriceHandler
 
 logger = logging.getLogger("__main__")
 logger.info("[BATTERY-IF] loading module ")
@@ -63,7 +64,9 @@ class BatteryInterface:
             Fetches the current SOC of the battery based on the configured source.
     """
 
-    def __init__(self, config, on_bat_max_changed=None):
+    def __init__(
+        self, config, on_bat_max_changed=None, load_interface=None, timezone=None
+    ):
         self.src = config.get("source", "default")
         self.url = config.get("url", "")
         self.soc_sensor = config.get("soc_sensor", "")
@@ -81,6 +84,11 @@ class BatteryInterface:
         self.price_sensor = config.get("price_euro_per_wh_sensor", "")
 
         self.soc_fail_count = 0
+
+        # Initialize dynamic price handler
+        self.price_handler = BatteryPriceHandler(
+            config, load_interface=load_interface, timezone=timezone
+        )
 
         self.update_interval = 30
         self._update_thread = None
@@ -189,6 +197,16 @@ class BatteryInterface:
         """
         Update the battery price from the configured source if needed.
         """
+        # If dynamic price calculation is enabled, use the handler
+        if self.price_handler and self.price_handler.price_calculation_enabled:
+            if self.price_handler.update_price_if_needed():
+                self.price_euro_per_wh = self.price_handler.get_current_price()
+                logger.info(
+                    "[BATTERY-IF] Dynamic battery price updated: %.4f €/kWh",
+                    self.price_euro_per_wh * 1000,
+                )
+            return self.price_euro_per_wh
+
         # If top-level source is default, keep configured static price
         if self.src == "default":
             return self.price_euro_per_wh
@@ -284,6 +302,12 @@ class BatteryInterface:
         Returns the current battery price in €/Wh.
         """
         return self.price_euro_per_wh
+
+    def get_stored_energy_info(self):
+        """
+        Returns detailed information about the stored energy cost analysis.
+        """
+        return self.price_handler.get_analysis_results()
 
     def set_min_soc(self, min_soc):
         """
