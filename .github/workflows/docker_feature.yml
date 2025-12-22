@@ -44,6 +44,9 @@ jobs:
       - name: Convert repository owner to lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Sanitize ref name for Docker tag
+        run: echo "clean_ref=$(echo '${{ github.ref_name }}' | sed 's/\//_/g')" >> $GITHUB_ENV
+
       # 1. Setup QEMU for ARM64 emulation
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -69,5 +72,5 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ env.owner }}/eos_connect:feature_dev_${{ github.ref_name }}
+            ghcr.io/${{ env.owner }}/eos_connect:feature_dev_${{ env.clean_ref }}
           push: true
