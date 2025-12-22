@@ -53,8 +53,46 @@ body {
 }
 
 @media (max-width: 768px) {
+    .battery-stats-container {
+        gap: 5px !important;
+    }
+    .battery-stat-card {
+        padding: 8px;
+        min-height: 60px;
+    }
     .battery-stat-card .value {
-        font-size: 1.2em;
+        font-size: 1.1em;
+    }
+    .battery-stat-card .label {
+        font-size: 0.7em;
+        margin-bottom: 2px;
+    }
+    .battery-stat-card .sub-label {
+        display: none;
+    }
+    /* Compact sections on mobile */
+    .battery-overview-section {
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+    .battery-overview-card {
+        padding: 10px !important;
+    }
+    .battery-overview-card table {
+        font-size: 0.75em !important;
+    }
+    .battery-overview-card td, .battery-overview-card th {
+        padding: 4px 2px !important;
+    }
+}
+
+/* Very small screens (e.g. iPhone SE) */
+@media (max-width: 400px) {
+    .battery-sessions-list {
+        display: none !important;
+    }
+    .battery-overview-card {
+        flex: 1 1 0 !important; /* Let the chart take all space */
     }
 }
 

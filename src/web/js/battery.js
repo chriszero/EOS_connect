@@ -46,10 +46,10 @@ class BatteryManager {
         const lastUpdate = stored.last_update ? new Date(stored.last_update).toLocaleString() : "Never";
 
         const content = `
-            <div style="height: 100%; overflow: hidden; padding: 10px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box;">
+            <div class="battery-overview-section" style="height: 100%; overflow: hidden; padding: 10px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box;">
                 
                 <!-- Top Stats Cards -->
-                <div style="flex: 0 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+                <div class="battery-stats-container" style="flex: 0 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;">
                     <div class="battery-stat-card">
                         <div class="label">State of Charge</div>
                         <div class="value">${soc}%</div>
@@ -78,7 +78,7 @@ class BatteryManager {
                 </div>
 
                 <!-- Chart Section -->
-                <div style="background-color: rgba(0,0,0,0.2); border-radius: 8px; padding: 15px; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column;">
+                <div class="battery-overview-card" style="background-color: rgba(0,0,0,0.2); border-radius: 8px; padding: 15px; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex: 0 0 auto;">
                         <div style="font-weight: bold; color: #ccc;">Recent Charging Sessions</div>
                         <div style="font-size: 0.8em; color: #888;">Last analysis: ${lastUpdate}</div>
@@ -89,7 +89,7 @@ class BatteryManager {
                 </div>
 
                 <!-- Session List -->
-                <div style="background-color: rgba(0,0,0,0.2); border-radius: 8px; padding: 15px; flex: 0 1 30%; min-height: 120px; display: flex; flex-direction: column;">
+                <div class="battery-overview-card battery-sessions-list" style="background-color: rgba(0,0,0,0.2); border-radius: 8px; padding: 15px; flex: 0 1 30%; min-height: 120px; display: flex; flex-direction: column;">
                     <div style="font-weight: bold; color: #ccc; margin-bottom: 10px; flex: 0 0 auto;">Session Details (${sessions.length} sessions in last ${lookbackHours}h)</div>
                     <div style="flex: 1 1 0; overflow-y: auto; min-height: 0;">
                         <table style="width: 100%; font-size: 0.85em; border-collapse: collapse;">
@@ -162,6 +162,10 @@ class BatteryManager {
         const pvData = sessions.map(s => s.charged_from_pv / 1000);
         const gridData = sessions.map(s => s.charged_from_grid / 1000);
 
+        const mobile = isMobile();
+        const fontSize = mobile ? 9 : 12;
+        const tickSize = mobile ? 9 : 11;
+
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -186,8 +190,13 @@ class BatteryManager {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
+                        display: window.innerWidth > 400,
                         position: 'top',
-                        labels: { color: '#ccc' }
+                        labels: { 
+                            color: '#ccc',
+                            font: { size: fontSize },
+                            boxWidth: mobile ? 10 : 40
+                        }
                     },
                     tooltip: {
                         mode: 'index',
@@ -197,13 +206,26 @@ class BatteryManager {
                 scales: {
                     x: {
                         stacked: true,
-                        ticks: { color: '#888', maxRotation: 45, minRotation: 45 },
+                        ticks: { 
+                            color: '#888', 
+                            maxRotation: 45, 
+                            minRotation: 45,
+                            font: { size: tickSize }
+                        },
                         grid: { color: 'rgba(255,255,255,0.05)' }
                     },
                     y: {
                         stacked: true,
-                        title: { display: true, text: 'Energy (kWh)', color: '#888' },
-                        ticks: { color: '#888' },
+                        title: { 
+                            display: !mobile, 
+                            text: 'Energy (kWh)', 
+                            color: '#888',
+                            font: { size: fontSize }
+                        },
+                        ticks: { 
+                            color: '#888',
+                            font: { size: tickSize }
+                        },
                         grid: { color: 'rgba(255,255,255,0.05)' }
                     }
                 }
