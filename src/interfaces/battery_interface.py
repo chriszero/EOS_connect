@@ -160,17 +160,52 @@ class BatteryInterface:
             cleaned_value = raw_state.split()[0]
             raw_value = float(cleaned_value)
             if raw_value <= 1.0:
-                soc = raw_value * 100
-                logger.debug(
-                    "[BATTERY-IF] Detected decimal format (0.0-1.0): %s -> %s%%",
-                    raw_value,
-                    soc,
-                )
+                # Use history to decide which format is closer to the last known value.
+                # If it's the first run (current_soc == 0), we default to decimal (x100)
+                # UNLESS the value is exactly 1.0, which we treat as 1% to avoid
+                # jumping to 100% incorrectly.
+                if self.current_soc > 0:
+                    diff_as_decimal = abs((raw_value * 100) - self.current_soc)
+                    diff_as_percent = abs(raw_value - self.current_soc)
+
+                    if diff_as_percent < diff_as_decimal:
+                        soc = raw_value
+                        logger.debug(
+                            "[BATTERY-IF] Auto-detected percentage format "
+                            "(0-1) based on history: %s%%",
+                            soc,
+                        )
+                    else:
+                        soc = raw_value * 100
+                        logger.debug(
+                            "[BATTERY-IF] Auto-detected decimal format "
+                            "(0.0-1.0) based on history: %s -> %s%%",
+                            raw_value,
+                            soc,
+                        )
+                elif raw_value == 1.0:
+                    # Special case for first run: 1.0 is more likely 1% than 100%
+                    # if we want to avoid accidental full-battery assumptions.
+                    soc = 1.0
+                    logger.debug(
+                        "[BATTERY-IF] First run: assuming 1.0 is 1%% (percentage format)"
+                    )
+                else:
+                    # Default for other values <= 1.0 on first run: assume decimal
+                    soc = raw_value * 100
+                    logger.debug(
+                        "[BATTERY-IF] First run: assuming decimal format "
+                        "for value %s -> %s%%",
+                        raw_value,
+                        soc,
+                    )
             else:
+                # Values > 1.0 are clearly percentage format (0-100).
                 soc = raw_value
                 logger.debug(
                     "[BATTERY-IF] Detected percentage format (0-100): %s%%", soc
                 )
+
             self.soc_fail_count = 0
             return round(soc, 1)
         except requests.exceptions.Timeout:

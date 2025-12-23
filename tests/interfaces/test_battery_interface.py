@@ -275,3 +275,79 @@ def test_shutdown_stops_thread(default_config):
     bi = BatteryInterface(default_config)
     bi.shutdown()
     assert not bi._update_thread.is_alive()
+
+
+def test_soc_autodetect_first_run_1_0_is_1_percent(default_config):
+    """On first run (current_soc=0), 1.0 should be treated as 1% (percentage format)."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 1.0
+
+
+def test_soc_autodetect_first_run_0_5_is_50_percent(default_config):
+    """On first run (current_soc=0), other values <= 1.0 (like 0.5) should be treated as decimal (50%)."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="0.5"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 50.0
+
+
+def test_soc_autodetect_ambiguous_1_0_as_1_percent(default_config):
+    """If current_soc is low (e.g. 0.9), 1.0 should be detected as 1%."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0.9
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 1.0
+
+
+def test_soc_autodetect_ambiguous_1_0_as_100_percent(default_config):
+    """If current_soc is high (e.g. 99.0), 1.0 should be detected as 100%."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 99.0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 100.0
+
+
+def test_soc_autodetect_sweep_decimal(default_config):
+    """Test a sweep from 0.0 to 1.0 (decimal format) with optimized steps."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 50.0
+
+    for i in range(10, 101, 5):
+        val = i / 100.0
+        with patch.object(
+            bi, "_BatteryInterface__fetch_remote_state", return_value=str(val)
+        ):
+            soc = bi._BatteryInterface__fetch_soc_data_unified()
+            assert soc == float(i)
+            bi.current_soc = soc
+
+
+def test_soc_autodetect_sweep_percentage(default_config):
+    """Test a sweep from 0 to 100 (percentage format) with optimized steps."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 5.0
+
+    for i in range(10, 101, 5):
+        val = float(i)
+        with patch.object(
+            bi, "_BatteryInterface__fetch_remote_state", return_value=str(val)
+        ):
+            soc = bi._BatteryInterface__fetch_soc_data_unified()
+            assert soc == float(i)
+            bi.current_soc = soc
