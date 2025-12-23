@@ -80,6 +80,7 @@ class BatteryPriceHandler:
         # State
         self.price_euro_per_wh = self.price_euro_per_wh_accu
         self.last_price_calculation: Optional[datetime] = None
+        self.battery_power_convention: Optional[str] = None  # Will be auto-detected
         self.last_analysis_results = {
             "stored_energy_price": self.price_euro_per_wh_accu,
             "duration_of_analysis": 0,
@@ -158,14 +159,73 @@ class BatteryPriceHandler:
                 round(inventory_wh, 1) if inventory_wh is not None else "N/A",
             )
 
-            # Fetch historical data (Step 1: Battery Power only)
+            # Fetch historical data - include all sensors if convention detection needed
+            keys_to_fetch = ["battery_power"]
+            detection_hours = min(24, lookback_hours)  # Use max 24 hours for detection
+            if self.battery_power_convention is None:
+                # Need all sensors for context-aware convention detection
+                keys_to_fetch = [
+                    "battery_power",
+                    "pv_power",
+                    "grid_power",
+                    "load_power",
+                ]
+                logger.info(
+                    "[BATTERY-PRICE] Convention not detected, fetching %sh of sensor data for analysis",
+                    detection_hours,
+                )
+
+            # Fetch historical data - include all sensors if convention detection needed
+            keys_to_fetch = ["battery_power"]
+            detection_hours = min(24, lookback_hours)  # Use max 24 hours for detection
+            if self.battery_power_convention is None:
+                # Need all sensors for context-aware convention detection
+                keys_to_fetch = [
+                    "battery_power",
+                    "pv_power",
+                    "grid_power",
+                    "load_power",
+                ]
+                logger.info(
+                    "[BATTERY-PRICE] Convention not detected, fetching %sh of sensor data for analysis",
+                    detection_hours,
+                )
+
             historical_data = self._fetch_historical_power_data(
-                lookback_hours, keys=["battery_power"]
+                (
+                    detection_hours
+                    if self.battery_power_convention is None
+                    else lookback_hours
+                ),
+                keys=keys_to_fetch,
             )
             if not historical_data or not historical_data.get("battery_power"):
                 logger.warning("[BATTERY-PRICE] No battery power data available")
                 self.last_analysis_results["last_update"] = self._get_now_iso()
                 return None
+
+            # If we did detection with limited data and need full data for analysis
+            if (
+                self.battery_power_convention is not None
+                and detection_hours < lookback_hours
+            ):
+                logger.info(
+                    "[BATTERY-PRICE] Convention detected, fetching full %sh of data for analysis",
+                    lookback_hours,
+                )
+                # Fetch the remaining sensors for the full period
+                full_data = self._fetch_historical_power_data(
+                    lookback_hours,
+                    keys=[
+                        "battery_power",
+                        "pv_power",
+                        "grid_power",
+                        "load_power",
+                        "price_data",
+                    ],
+                )
+                if full_data:
+                    historical_data.update(full_data)
 
             # Reconstruct charging events
             charging_events = self._identify_charging_periods(historical_data)
@@ -462,9 +522,10 @@ class BatteryPriceHandler:
                 )
                 # Handle potential units in state string (e.g. "10.5 W")
                 state_val = entry.get("state")
+                if state_val is None:
+                    continue
                 if isinstance(state_val, str):
                     state_val = state_val.split()[0]
-
                 value = float(state_val)
                 # Price conversion logic
                 if key == "price_data":
@@ -492,10 +553,122 @@ class BatteryPriceHandler:
         local_tz = self.timezone if self.timezone else pytz.timezone("Europe/Berlin")
         return dt.astimezone(local_tz).strftime("%Y-%m-%d %H:%M:%S")
 
+    def _detect_battery_power_convention(self, historical_data: Dict) -> str:
+        """Detect battery power convention from historical data by analyzing charging context."""
+        if "battery_power" not in historical_data:
+            return "positive_charging"  # default
+
+        battery_data = historical_data["battery_power"]
+        pv_data = historical_data.get("pv_power", [])
+        grid_data = historical_data.get("grid_power", [])
+        load_data = historical_data.get("load_power", [])
+
+        if not battery_data:
+            return "positive_charging"
+
+        # Sort all data by timestamp for alignment
+        battery_data.sort(key=lambda x: x["timestamp"])
+        pv_data.sort(key=lambda x: x["timestamp"])
+        grid_data.sort(key=lambda x: x["timestamp"])
+        load_data.sort(key=lambda x: x["timestamp"])
+
+        # Counters for contextual charging events
+        evcc_charging_count = 0  # negative battery power + energy available
+        standard_charging_count = 0  # positive battery power + energy available
+
+        threshold = self.charging_threshold_w
+
+        for battery_point in battery_data:
+            battery_power = battery_point.get("value", 0)
+            timestamp = battery_point["timestamp"]
+
+            # Only consider significant battery power events
+            if abs(battery_power) <= threshold:
+                continue
+
+            # Check if energy is available for charging at this timestamp
+            grid_power = self._get_value_at_timestamp(grid_data, timestamp)
+            pv_power = self._get_value_at_timestamp(pv_data, timestamp)
+            load_power = self._get_value_at_timestamp(load_data, timestamp)
+
+            # Determine if there's surplus energy available
+            # Grid import indicates energy available for charging
+            grid_importing = grid_power > threshold
+            # PV surplus: PV producing more than load (with some margin for battery charging)
+            pv_surplus = pv_power > (load_power + threshold)
+
+            energy_available = grid_importing or pv_surplus
+
+            if energy_available:
+                if battery_power < 0:
+                    evcc_charging_count += 1  # EVCC: negative = charging
+                elif battery_power > 0:
+                    standard_charging_count += 1  # Standard: positive = charging
+
+        # Determine convention based on contextual charging events
+        total_contextual_events = evcc_charging_count + standard_charging_count
+
+        if total_contextual_events < 3:
+            # Not enough contextual data, fall back to simple heuristic
+            return self._fallback_convention_detection(battery_data)
+        elif evcc_charging_count > standard_charging_count:
+            return "negative_charging"
+        else:
+            return "positive_charging"
+
+    def _get_value_at_timestamp(
+        self, data: List[Dict], target_timestamp: datetime
+    ) -> float:
+        """Get the sensor value closest to the target timestamp."""
+        if not data:
+            return 0.0
+
+        # Find the closest timestamp
+        closest_point = min(
+            data, key=lambda x: abs((x["timestamp"] - target_timestamp).total_seconds())
+        )
+        time_diff = abs((closest_point["timestamp"] - target_timestamp).total_seconds())
+
+        # Only use if within reasonable time window (5 minutes)
+        if time_diff <= 300:
+            return closest_point.get("value", 0.0)
+        return 0.0
+
+    def _fallback_convention_detection(self, battery_data: List[Dict]) -> str:
+        """Fallback detection when contextual analysis has insufficient data."""
+        # Simple heuristic: look at the most common sign of high-power events
+        threshold = self.charging_threshold_w * 2
+        positive_count = 0
+        negative_count = 0
+
+        for point in battery_data:
+            power = abs(point.get("value", 0))
+            if power > threshold:
+                if point.get("value", 0) > 0:
+                    positive_count += 1
+                elif point.get("value", 0) < 0:
+                    negative_count += 1
+
+        return (
+            "negative_charging"
+            if negative_count > positive_count
+            else "positive_charging"
+        )
+
     def _identify_charging_periods(self, historical_data: Dict) -> List[Dict]:
         """Identify periods when battery was charging."""
         if not historical_data or "battery_power" not in historical_data:
             return []
+
+        # Auto-detect convention if not already detected
+        if self.battery_power_convention is None:
+            self.battery_power_convention = self._detect_battery_power_convention(
+                historical_data
+            )
+            logger.info(
+                "[BATTERY-PRICE] Auto-detected battery power convention: %s",
+                self.battery_power_convention,
+            )
 
         charging_events: List[Dict[str, Any]] = []
         battery_data = historical_data["battery_power"]
@@ -509,7 +682,13 @@ class BatteryPriceHandler:
             power = point.get("value", 0)
             timestamp = point.get("timestamp")
 
-            if power > threshold:
+            # Normalize power to positive for charging
+            if self.battery_power_convention == "negative_charging":
+                normalized_power = -power
+            else:
+                normalized_power = power
+
+            if normalized_power > threshold:
                 if current_event is None:
                     current_event = {
                         "start_time": timestamp,
@@ -553,11 +732,18 @@ class BatteryPriceHandler:
         self, event: Dict, events_list: List[Dict], threshold: float
     ):
         """Trim and add a charging event to the list."""
-        while (
-            len(event["power_points"]) > 0
-            and event["power_points"][-1]["value"] <= threshold
-        ):
-            event["power_points"].pop()
+        while len(event["power_points"]) > 0:
+            last_point = event["power_points"][-1]
+            power = last_point["value"]
+            # Normalize power
+            if self.battery_power_convention == "negative_charging":
+                normalized_power = -power
+            else:
+                normalized_power = power
+            if normalized_power <= threshold:
+                event["power_points"].pop()
+            else:
+                break
 
         if event["power_points"]:
             event["end_time"] = event["power_points"][-1]["timestamp"]
@@ -616,8 +802,12 @@ class BatteryPriceHandler:
                 fallback_func=self._get_fallback_price,
             )
 
-            # Use average battery power for the interval
-            avg_battery_power = (p_start["value"] + p_end["value"]) / 2.0
+            # Use average battery power for the interval, normalized to positive for charging
+            raw_avg_power = (p_start["value"] + p_end["value"]) / 2.0
+            if self.battery_power_convention == "negative_charging":
+                avg_battery_power = -raw_avg_power
+            else:
+                avg_battery_power = raw_avg_power
 
             pv_to_bat, grid_to_bat = self._calculate_power_split(
                 avg_battery_power, pv_power, grid_power, load_power
