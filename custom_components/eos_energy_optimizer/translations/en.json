@@ -7,9 +7,7 @@
         "data": {
           "eos_server": "EOS Server Address",
           "eos_port": "EOS Server Port",
-          "eos_source": "Optimization Backend",
-          "refresh_time": "Refresh Interval (minutes)",
-          "time_frame": "Time Frame"
+          "refresh_time": "Refresh Interval (minutes)"
         }
       },
       "battery": {
@@ -51,10 +49,19 @@
           "max_grid_charge_rate": "Max Grid Charge Rate (W)",
           "max_pv_charge_rate": "Max PV Charge Rate (W)"
         }
+      },
+      "evcc": {
+        "title": "EVCC Configuration (Optional)",
+        "description": "Connect EVCC for EV charging monitoring and battery control.\n\nIf EVCC is enabled, battery control will be performed via EVCC.",
+        "data": {
+          "evcc_enabled": "Enable EVCC",
+          "evcc_url": "EVCC Server URL (e.g. http://evcc:7070)"
+        }
       }
     },
     "error": {
       "cannot_connect": "Cannot connect to EOS server",
+      "evcc_cannot_connect": "Cannot connect to EVCC server",
       "unknown": "Unknown error occurred"
     },
     "abort": {

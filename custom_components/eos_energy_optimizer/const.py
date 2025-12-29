@@ -10,7 +10,6 @@ MANUFACTURER: Final = "EOS Energy Optimizer"
 # Configuration keys
 CONF_EOS_SERVER: Final = "eos_server"
 CONF_EOS_PORT: Final = "eos_port"
-CONF_EOS_SOURCE: Final = "eos_source"
 CONF_TIME_FRAME: Final = "time_frame"
 CONF_REFRESH_TIME: Final = "refresh_time"
 CONF_BATTERY_CAPACITY: Final = "battery_capacity_wh"
@@ -30,9 +29,12 @@ CONF_MAX_GRID_CHARGE_RATE: Final = "max_grid_charge_rate"
 CONF_MAX_PV_CHARGE_RATE: Final = "max_pv_charge_rate"
 CONF_CHARGING_CURVE_ENABLED: Final = "charging_curve_enabled"
 
+# EVCC configuration
+CONF_EVCC_ENABLED: Final = "evcc_enabled"
+CONF_EVCC_URL: Final = "evcc_url"
+
 # Default values
 DEFAULT_EOS_PORT: Final = 8503
-DEFAULT_EVOPT_PORT: Final = 7050
 DEFAULT_TIME_FRAME: Final = 3600
 DEFAULT_REFRESH_TIME: Final = 3
 DEFAULT_BATTERY_CAPACITY: Final = 10000
@@ -41,10 +43,18 @@ DEFAULT_BATTERY_MAX_CHARGE: Final = 5000
 DEFAULT_BATTERY_MIN_SOC: Final = 5
 DEFAULT_BATTERY_MAX_SOC: Final = 95
 DEFAULT_FEED_IN_PRICE: Final = 0.08
+DEFAULT_EVCC_URL: Final = ""
 
-# EOS Sources
-EOS_SOURCE_EOS: Final = "eos_server"
-EOS_SOURCE_EVOPT: Final = "evopt"
+# EVCC charging modes
+EVCC_MODE_OFF: Final = "off"
+EVCC_MODE_PV: Final = "pv"
+EVCC_MODE_MINPV: Final = "minpv"
+EVCC_MODE_NOW: Final = "now"
+
+# EVCC battery modes (for external battery control)
+EVCC_BATTERY_HOLD: Final = "hold"
+EVCC_BATTERY_NORMAL: Final = "normal"
+EVCC_BATTERY_CHARGE: Final = "charge"
 
 # Price sources - use HA sensors from existing integrations
 PRICE_SOURCE_HA_SENSOR: Final = "ha_sensor"
@@ -87,6 +97,7 @@ SERVICE_SET_OVERRIDE: Final = "set_override"
 SERVICE_CLEAR_OVERRIDE: Final = "clear_override"
 SERVICE_REFRESH_OPTIMIZATION: Final = "refresh_optimization"
 SERVICE_SET_SOC_LIMITS: Final = "set_soc_limits"
+SERVICE_SET_EVCC_BATTERY_MODE: Final = "set_evcc_battery_mode"
 
 # Platforms
 PLATFORMS: Final = ["sensor", "binary_sensor", "select", "number", "button"]

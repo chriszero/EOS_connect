@@ -7,9 +7,7 @@
         "data": {
           "eos_server": "EOS Server Address",
           "eos_port": "EOS Server Port",
-          "eos_source": "Optimization Backend",
-          "refresh_time": "Refresh Interval (minutes)",
-          "time_frame": "Time Frame"
+          "refresh_time": "Refresh Interval (minutes)"
         }
       },
       "battery": {
@@ -27,25 +25,20 @@
         }
       },
       "pv": {
-        "title": "PV System Configuration",
-        "description": "Configure your photovoltaic system for forecasting.",
+        "title": "PV Forecast Configuration",
+        "description": "Select a PV forecast sensor from an existing integration (Solcast, Forecast.Solar, Open-Meteo Solar).\n\nThe sensor should have forecast data in its attributes.",
         "data": {
-          "pv_forecast_source": "PV Forecast Source",
-          "pv_latitude": "Latitude",
-          "pv_longitude": "Longitude",
-          "pv_power_wp": "PV Power (Wp)",
-          "pv_azimuth": "Azimuth (°)",
-          "pv_tilt": "Tilt (°)"
+          "pv_forecast_entity": "PV Forecast Sensor"
         }
       },
       "price": {
         "title": "Electricity Price Configuration",
-        "description": "Configure your electricity price source.",
+        "description": "Select a price sensor from an existing integration (Tibber, ENTSO-E, Nordpool, EPEX Spot, Awattar).\n\nThe sensor should have hourly price data in its attributes.",
         "data": {
           "price_source": "Price Source",
-          "tibber_token": "Tibber API Token",
-          "feed_in_price": "Feed-in Tariff (€/kWh)",
-          "fixed_price": "Fixed Price (€/kWh)"
+          "price_entity": "Electricity Price Sensor",
+          "fixed_price": "Fixed Price (€/kWh)",
+          "feed_in_price": "Feed-in Tariff (€/kWh)"
         }
       },
       "load": {
@@ -56,10 +49,19 @@
           "max_grid_charge_rate": "Max Grid Charge Rate (W)",
           "max_pv_charge_rate": "Max PV Charge Rate (W)"
         }
+      },
+      "evcc": {
+        "title": "EVCC Configuration (Optional)",
+        "description": "Connect EVCC for EV charging monitoring and battery control.\n\nIf EVCC is enabled, battery control will be performed via EVCC.",
+        "data": {
+          "evcc_enabled": "Enable EVCC",
+          "evcc_url": "EVCC Server URL (e.g. http://evcc:7070)"
+        }
       }
     },
     "error": {
       "cannot_connect": "Cannot connect to EOS server",
+      "evcc_cannot_connect": "Cannot connect to EVCC server",
       "unknown": "Unknown error occurred"
     },
     "abort": {
@@ -72,12 +74,16 @@
         "title": "EOS Energy Optimizer Options",
         "data": {
           "refresh_time": "Refresh Interval (minutes)",
+          "pv_forecast_entity": "PV Forecast Sensor",
+          "price_entity": "Electricity Price Sensor",
           "battery_min_soc": "Minimum SOC (%)",
           "battery_max_soc": "Maximum SOC (%)",
           "max_grid_charge_rate": "Max Grid Charge Rate (W)",
           "max_pv_charge_rate": "Max PV Charge Rate (W)",
           "feed_in_price": "Feed-in Tariff (€/kWh)",
-          "charging_curve_enabled": "Enable Charging Curve"
+          "charging_curve_enabled": "Enable Charging Curve",
+          "evcc_enabled": "Enable EVCC",
+          "evcc_url": "EVCC Server URL"
         }
       }
     }
@@ -140,6 +146,12 @@
       },
       "override_power": {
         "name": "Override Charge Power"
+      },
+      "evcc_charging_mode": {
+        "name": "EVCC Charging Mode"
+      },
+      "evcc_vehicle_soc": {
+        "name": "EVCC Vehicle SOC"
       }
     },
     "binary_sensor": {
@@ -157,11 +169,20 @@
       },
       "optimization_ok": {
         "name": "Optimization OK"
+      },
+      "evcc_charging": {
+        "name": "EVCC Charging"
+      },
+      "evcc_connected": {
+        "name": "EVCC Connected"
       }
     },
     "select": {
       "inverter_mode_control": {
         "name": "Inverter Mode Control"
+      },
+      "evcc_battery_mode": {
+        "name": "EVCC Battery Mode"
       }
     },
     "number": {
@@ -232,6 +253,16 @@
         "max_soc": {
           "name": "Maximum SOC",
           "description": "Maximum SOC percentage"
+        }
+      }
+    },
+    "set_evcc_battery_mode": {
+      "name": "Set EVCC Battery Mode",
+      "description": "Set the EVCC external battery mode.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "Battery mode (hold, normal, charge)"
         }
       }
     }

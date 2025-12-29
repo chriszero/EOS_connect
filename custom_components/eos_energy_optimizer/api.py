@@ -24,7 +24,8 @@ from .const import (
     CONF_CHARGING_CURVE_ENABLED,
     CONF_EOS_PORT,
     CONF_EOS_SERVER,
-    CONF_EOS_SOURCE,
+    CONF_EVCC_ENABLED,
+    CONF_EVCC_URL,
     CONF_FEED_IN_PRICE,
     CONF_FIXED_PRICE,
     CONF_LOAD_SENSOR,
@@ -41,12 +42,13 @@ from .const import (
     DEFAULT_BATTERY_MAX_SOC,
     DEFAULT_BATTERY_MIN_SOC,
     DEFAULT_EOS_PORT,
-    DEFAULT_EVOPT_PORT,
     DEFAULT_FEED_IN_PRICE,
     DEFAULT_REFRESH_TIME,
     DEFAULT_TIME_FRAME,
     DOMAIN,
-    EOS_SOURCE_EVOPT,
+    EVCC_BATTERY_CHARGE,
+    EVCC_BATTERY_HOLD,
+    EVCC_BATTERY_NORMAL,
     InverterMode,
     PRICE_SOURCE_FIXED,
     PRICE_SOURCE_HA_SENSOR,
@@ -102,11 +104,44 @@ class BatteryState:
 
 
 @dataclass
+class EVCCLoadpoint:
+    """EVCC loadpoint data."""
+
+    connected: bool = False
+    charging: bool = False
+    mode: str = "off"
+    charge_duration: int = 0
+    charge_remaining_duration: int = 0
+    charged_energy: float = 0.0
+    charge_remaining_energy: float = 0.0
+    session_energy: float = 0.0
+    vehicle_soc: float = 0.0
+    vehicle_range: int = 0
+    vehicle_name: str = ""
+    smart_cost_active: bool = False
+    plan_active: bool = False
+
+
+@dataclass
+class EVCCState:
+    """EVCC state."""
+
+    enabled: bool = False
+    connected: bool = False
+    version: str = ""
+    charging_state: bool = False
+    charging_mode: str = "off"
+    battery_mode: str = "normal"
+    loadpoints: list[EVCCLoadpoint] = field(default_factory=list)
+
+
+@dataclass
 class EOSData:
     """All EOS data."""
 
     control: ControlState = field(default_factory=ControlState)
     battery: BatteryState = field(default_factory=BatteryState)
+    evcc: EVCCState = field(default_factory=EVCCState)
     optimization: OptimizationResult = field(default_factory=OptimizationResult)
     pv_forecast: list[float] = field(default_factory=list)
     prices: list[float] = field(default_factory=list)
@@ -133,6 +168,11 @@ class EOSApiClient:
         self._lock = asyncio.Lock()
         self._eos_version: str = "0.0.1"
         self._time_frame_base: int = config.get(CONF_TIME_FRAME, DEFAULT_TIME_FRAME)
+
+        # EVCC configuration
+        self._evcc_enabled = config.get(CONF_EVCC_ENABLED, False)
+        self._evcc_url = config.get(CONF_EVCC_URL, "")
+        self._data.evcc.enabled = self._evcc_enabled
 
     @property
     def data(self) -> EOSData:
@@ -189,11 +229,7 @@ class EOSApiClient:
     def _get_eos_url(self) -> str:
         """Get the EOS server URL."""
         server = self.config.get(CONF_EOS_SERVER, "localhost")
-        source = self.config.get(CONF_EOS_SOURCE, "eos_server")
-        if source == EOS_SOURCE_EVOPT:
-            port = self.config.get(CONF_EOS_PORT, DEFAULT_EVOPT_PORT)
-        else:
-            port = self.config.get(CONF_EOS_PORT, DEFAULT_EOS_PORT)
+        port = self.config.get(CONF_EOS_PORT, DEFAULT_EOS_PORT)
         return f"http://{server}:{port}"
 
     def is_eos_version_at_least(self, version_string: str) -> bool:
@@ -226,8 +262,7 @@ class EOSApiClient:
     async def async_run_optimization(self) -> OptimizationResult:
         """Run optimization request to EOS server.
 
-        Uses the /optimize endpoint with start_hour parameter for EOS,
-        or /api/optimize for EVopt backend.
+        Uses the /optimize endpoint with start_hour parameter.
         """
         async with self._lock:
             try:
@@ -241,14 +276,8 @@ class EOSApiClient:
                 request_data = await self._build_optimization_request()
                 session = await self._get_session()
 
-                source = self.config.get(CONF_EOS_SOURCE, "eos_server")
                 current_hour = dt_util.now().hour
-
-                if source == EOS_SOURCE_EVOPT:
-                    url = f"{self._get_eos_url()}/api/optimize"
-                else:
-                    # EOS server with start_hour parameter
-                    url = f"{self._get_eos_url()}/optimize?start_hour={current_hour}"
+                url = f"{self._get_eos_url()}/optimize?start_hour={current_hour}"
 
                 _LOGGER.debug("Sending optimization request to %s", url)
 
@@ -849,3 +878,164 @@ class EOSApiClient:
         self.config[CONF_BATTERY_MAX_SOC] = max_soc
         self._update_battery_state()
         return True
+
+    # EVCC Methods
+
+    async def async_test_evcc_connection(self) -> bool:
+        """Test EVCC connection and get version."""
+        if not self._evcc_enabled or not self._evcc_url:
+            return False
+
+        try:
+            session = await self._get_session()
+            async with session.get(
+                f"{self._evcc_url}/api/state",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # Handle both old and new EVCC API formats
+                    if "result" in data:
+                        evcc_data = data["result"]
+                        self._data.evcc.version = evcc_data.get("version", "")
+                    else:
+                        evcc_data = data
+                        self._data.evcc.version = data.get("version", "")
+                    self._data.evcc.connected = True
+                    _LOGGER.info("Connected to EVCC version: %s", self._data.evcc.version)
+                    return True
+                return False
+        except Exception as e:
+            _LOGGER.error("EVCC connection test failed: %s", e)
+            self._data.evcc.connected = False
+            return False
+
+    async def async_update_evcc(self) -> None:
+        """Update EVCC state."""
+        if not self._evcc_enabled or not self._evcc_url:
+            return
+
+        try:
+            session = await self._get_session()
+            async with session.get(
+                f"{self._evcc_url}/api/state",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # Handle both old and new EVCC API formats
+                    if "result" in data:
+                        evcc_data = data["result"]
+                    else:
+                        evcc_data = data
+
+                    self._data.evcc.connected = True
+                    self._parse_evcc_state(evcc_data)
+                else:
+                    _LOGGER.warning("EVCC API returned status %s", resp.status)
+                    self._data.evcc.connected = False
+        except Exception as e:
+            _LOGGER.error("Failed to update EVCC state: %s", e)
+            self._data.evcc.connected = False
+
+    def _parse_evcc_state(self, data: dict[str, Any]) -> None:
+        """Parse EVCC state from API response."""
+        loadpoints = data.get("loadpoints", [])
+        vehicles = data.get("vehicles", {})
+
+        self._data.evcc.loadpoints = []
+        charging_state = False
+        charging_mode = "off"
+        highest_mode_priority = 0
+
+        mode_priority = {"off": 0, "pv": 1, "minpv": 2, "now": 3}
+
+        for lp in loadpoints:
+            vehicle_name = vehicles.get(lp.get("vehicleName", ""), {}).get("title", "")
+            mode = lp.get("mode", "off")
+
+            # Track if any loadpoint is actively charging
+            if lp.get("charging", False):
+                charging_state = True
+                if mode_priority.get(mode, 0) > highest_mode_priority:
+                    highest_mode_priority = mode_priority.get(mode, 0)
+                    charging_mode = mode
+
+            loadpoint = EVCCLoadpoint(
+                connected=lp.get("connected", False),
+                charging=lp.get("charging", False),
+                mode=mode,
+                charge_duration=lp.get("chargeDuration", 0),
+                charge_remaining_duration=lp.get("chargeRemainingDuration", 0),
+                charged_energy=lp.get("chargedEnergy", 0),
+                charge_remaining_energy=lp.get("chargeRemainingEnergy", 0),
+                session_energy=lp.get("sessionEnergy", 0),
+                vehicle_soc=lp.get("vehicleSoc", 0),
+                vehicle_range=lp.get("vehicleRange", 0),
+                vehicle_name=vehicle_name,
+                smart_cost_active=lp.get("smartCostActive", False),
+                plan_active=lp.get("planActive", False),
+            )
+            self._data.evcc.loadpoints.append(loadpoint)
+
+        self._data.evcc.charging_state = charging_state
+        self._data.evcc.charging_mode = charging_mode if charging_state else (
+            loadpoints[0].get("mode", "off") if loadpoints else "off"
+        )
+
+    async def async_set_evcc_battery_mode(self, mode: str) -> bool:
+        """Set EVCC external battery mode.
+
+        Args:
+            mode: One of 'hold', 'normal', 'charge'
+        """
+        if not self._evcc_enabled or not self._evcc_url:
+            _LOGGER.warning("EVCC is not enabled or URL not set")
+            return False
+
+        mode_endpoints = {
+            EVCC_BATTERY_HOLD: f"{self._evcc_url}/api/batterymode/hold",
+            EVCC_BATTERY_NORMAL: f"{self._evcc_url}/api/batterymode/normal",
+            EVCC_BATTERY_CHARGE: f"{self._evcc_url}/api/batterymode/charge",
+        }
+
+        if mode not in mode_endpoints:
+            _LOGGER.error("Invalid EVCC battery mode: %s", mode)
+            return False
+
+        try:
+            session = await self._get_session()
+            async with session.post(
+                mode_endpoints[mode],
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    self._data.evcc.battery_mode = mode
+                    _LOGGER.info("EVCC battery mode set to: %s", mode)
+                    return True
+                else:
+                    _LOGGER.error("Failed to set EVCC battery mode: %s", resp.status)
+                    return False
+        except Exception as e:
+            _LOGGER.error("Error setting EVCC battery mode: %s", e)
+            return False
+
+    async def async_disable_evcc_battery_mode(self) -> bool:
+        """Disable EVCC external battery mode."""
+        if not self._evcc_enabled or not self._evcc_url:
+            return False
+
+        try:
+            session = await self._get_session()
+            async with session.delete(
+                f"{self._evcc_url}/api/batterymode",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    self._data.evcc.battery_mode = "normal"
+                    _LOGGER.info("EVCC battery mode disabled")
+                    return True
+                return False
+        except Exception as e:
+            _LOGGER.error("Error disabling EVCC battery mode: %s", e)
+            return False

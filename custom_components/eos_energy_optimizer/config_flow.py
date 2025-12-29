@@ -23,7 +23,8 @@ from .const import (
     CONF_CHARGING_CURVE_ENABLED,
     CONF_EOS_PORT,
     CONF_EOS_SERVER,
-    CONF_EOS_SOURCE,
+    CONF_EVCC_ENABLED,
+    CONF_EVCC_URL,
     CONF_FEED_IN_PRICE,
     CONF_FIXED_PRICE,
     CONF_LOAD_SENSOR,
@@ -33,7 +34,6 @@ from .const import (
     CONF_PRICE_SOURCE,
     CONF_PV_FORECAST_ENTITY,
     CONF_REFRESH_TIME,
-    CONF_TIME_FRAME,
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_EFFICIENCY,
     DEFAULT_BATTERY_MAX_CHARGE,
@@ -42,10 +42,7 @@ from .const import (
     DEFAULT_EOS_PORT,
     DEFAULT_FEED_IN_PRICE,
     DEFAULT_REFRESH_TIME,
-    DEFAULT_TIME_FRAME,
     DOMAIN,
-    EOS_SOURCE_EOS,
-    EOS_SOURCE_EVOPT,
     PRICE_SOURCE_FIXED,
     PRICE_SOURCE_HA_SENSOR,
 )
@@ -97,26 +94,8 @@ class EOSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_EOS_SERVER, default="localhost"): str,
                     vol.Required(CONF_EOS_PORT, default=DEFAULT_EOS_PORT): int,
-                    vol.Required(CONF_EOS_SOURCE, default=EOS_SOURCE_EOS): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                selector.SelectOptionDict(value=EOS_SOURCE_EOS, label="EOS Server"),
-                                selector.SelectOptionDict(value=EOS_SOURCE_EVOPT, label="EVopt Server"),
-                            ],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
                     vol.Required(CONF_REFRESH_TIME, default=DEFAULT_REFRESH_TIME): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=60, step=1, unit_of_measurement="min")
-                    ),
-                    vol.Required(CONF_TIME_FRAME, default=DEFAULT_TIME_FRAME): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                selector.SelectOptionDict(value="3600", label="Hourly (3600s)"),
-                                selector.SelectOptionDict(value="900", label="15 Minutes (900s)"),
-                            ],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
                     ),
                 }
             ),
@@ -251,15 +230,7 @@ class EOSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data.setdefault(CONF_MAX_GRID_CHARGE_RATE, self._data.get(CONF_BATTERY_MAX_CHARGE_POWER, DEFAULT_BATTERY_MAX_CHARGE))
             self._data.setdefault(CONF_MAX_PV_CHARGE_RATE, self._data.get(CONF_BATTERY_MAX_CHARGE_POWER, DEFAULT_BATTERY_MAX_CHARGE))
 
-            # Convert time_frame to int
-            if CONF_TIME_FRAME in self._data:
-                self._data[CONF_TIME_FRAME] = int(self._data[CONF_TIME_FRAME])
-
-            # Create entry
-            return self.async_create_entry(
-                title="EOS Energy Optimizer",
-                data=self._data,
-            )
+            return await self.async_step_evcc()
 
         return self.async_show_form(
             step_id="load",
@@ -277,6 +248,61 @@ class EOSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
         )
+
+    async def async_step_evcc(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle EVCC configuration step (optional).
+
+        EVCC can be used for:
+        - Monitoring EV charging status
+        - Battery control via EVCC's external battery mode
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            self._data.update(user_input)
+
+            # Validate EVCC connection if enabled
+            if user_input.get(CONF_EVCC_ENABLED) and user_input.get(CONF_EVCC_URL):
+                evcc_url = user_input[CONF_EVCC_URL].rstrip("/")
+                self._data[CONF_EVCC_URL] = evcc_url
+                if not await self._validate_evcc_connection(evcc_url):
+                    errors["base"] = "evcc_cannot_connect"
+                else:
+                    return self.async_create_entry(
+                        title="EOS Energy Optimizer",
+                        data=self._data,
+                    )
+            else:
+                # EVCC not enabled, proceed
+                return self.async_create_entry(
+                    title="EOS Energy Optimizer",
+                    data=self._data,
+                )
+
+        return self.async_show_form(
+            step_id="evcc",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_EVCC_ENABLED, default=False): bool,
+                    vol.Optional(CONF_EVCC_URL, default=""): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def _validate_evcc_connection(self, url: str) -> bool:
+        """Validate EVCC connection."""
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                f"{url}/api/state",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
 
     @staticmethod
     @callback

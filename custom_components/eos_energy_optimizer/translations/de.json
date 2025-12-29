@@ -7,9 +7,7 @@
         "data": {
           "eos_server": "EOS Server Adresse",
           "eos_port": "EOS Server Port",
-          "eos_source": "Optimierungs-Backend",
-          "refresh_time": "Aktualisierungsintervall (Minuten)",
-          "time_frame": "Zeitrahmen"
+          "refresh_time": "Aktualisierungsintervall (Minuten)"
         }
       },
       "battery": {
@@ -51,10 +49,19 @@
           "max_grid_charge_rate": "Max. Netzladerate (W)",
           "max_pv_charge_rate": "Max. PV-Laderate (W)"
         }
+      },
+      "evcc": {
+        "title": "EVCC Konfiguration (Optional)",
+        "description": "Verbinden Sie EVCC für EV-Lademonitoring und Batteriesteuerung.\n\nWenn EVCC aktiviert ist, wird die Batteriesteuerung über EVCC durchgeführt.",
+        "data": {
+          "evcc_enabled": "EVCC aktivieren",
+          "evcc_url": "EVCC Server URL (z.B. http://evcc:7070)"
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung zum EOS Server fehlgeschlagen",
+      "evcc_cannot_connect": "Verbindung zum EVCC Server fehlgeschlagen",
       "unknown": "Unbekannter Fehler aufgetreten"
     },
     "abort": {
