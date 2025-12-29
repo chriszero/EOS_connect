@@ -14,6 +14,18 @@ CONF_INVERTER_MAX_POWER = "inverter_max_power_w"
 CONF_ENTITY_LOAD = "entity_load"
 CONF_ENTITY_PV_FORECAST = "entity_pv_forecast"
 CONF_ENTITY_SOC = "entity_soc"
+CONF_ENTITY_PRICE = "entity_price"
+
+# EV Settings
+CONF_EV_ENABLED = "ev_enabled"
+CONF_ENTITY_EV_SOC = "entity_ev_soc"
+CONF_EV_CAPACITY = "ev_capacity_wh"
+CONF_EV_MAX_CHARGE_RATE = "ev_max_charge_rate_w"
+
+# Controllable Load (Dishwasher)
+CONF_LOAD_ENABLED = "load_enabled"
+CONF_LOAD_CONSUMPTION = "load_consumption_wh"
+CONF_LOAD_DURATION = "load_duration_h"
 
 # Control Mappings
 CONF_CONTROL_CHARGE_LIMIT = "control_charge_limit"

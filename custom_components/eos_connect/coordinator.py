@@ -21,6 +21,14 @@ from .const import (
     CONF_ENTITY_LOAD,
     CONF_ENTITY_PV_FORECAST,
     CONF_ENTITY_SOC,
+    CONF_ENTITY_PRICE,
+    CONF_EV_ENABLED,
+    CONF_ENTITY_EV_SOC,
+    CONF_EV_CAPACITY,
+    CONF_EV_MAX_CHARGE_RATE,
+    CONF_LOAD_ENABLED,
+    CONF_LOAD_CONSUMPTION,
+    CONF_LOAD_DURATION,
     CONF_CONTROL_CHARGE_LIMIT,
     CONF_CONTROL_DISCHARGE_LIMIT,
     CONF_CONTROL_MODE,
@@ -66,8 +74,14 @@ class EosConnectCoordinator(DataUpdateCoordinator):
             # 3. Get PV Forecast
             pv_forecast = await self._get_pv_forecast()
 
-            # 4. Construct Payload
-            payload = self._build_eos_payload(soc_val, load_profile, pv_forecast)
+            # 4. Get Prices
+            prices = await self._get_prices()
+
+            # 5. Get EV Status
+            ev_data = self._get_ev_status()
+
+            # 6. Construct Payload
+            payload = self._build_eos_payload(soc_val, load_profile, pv_forecast, prices, ev_data)
 
             # 5. Send to EOS
             self.optimization_status = "Optimizing"
@@ -231,14 +245,135 @@ class EosConnectCoordinator(DataUpdateCoordinator):
 
         return forecast_wh
 
-    def _build_eos_payload(self, soc, load_profile, pv_forecast):
+    async def _get_prices(self):
+        """Fetch prices from Tibber/Nordpool/Entsoe entity."""
+        # Returns vector of 48 prices (Euro/Wh)
+        # Defaults to flat 0.30 EUR/kWh -> 0.0003 EUR/Wh
+        prices_wh = [0.0003] * 48
+
+        entity_id = self.config_entry.data.get(CONF_ENTITY_PRICE)
+        if not entity_id:
+            return prices_wh
+
+        state = self.hass.states.get(entity_id)
+        if not state:
+            return prices_wh
+
+        # 1. Tibber / Nordpool usually have 'today' and 'tomorrow' attributes
+        # Arrays of values. Units usually EUR/kWh or c/kWh.
+
+        raw_today = state.attributes.get("today")
+        raw_tomorrow = state.attributes.get("tomorrow")
+
+        # Check unit
+        unit = state.attributes.get("unit_of_measurement", "").lower()
+        # Default factor: Input is EUR/kWh, Output EUR/Wh => divide by 1000
+        factor = 1.0 / 1000.0
+
+        if "cent" in unit or "ct" in unit:
+            # Input cents/kWh -> EUR/Wh => divide by 100 and 1000 => / 100000
+            factor = 1.0 / 100000.0
+        elif "wh" in unit and "k" not in unit:
+             # Already /Wh
+             factor = 1.0
+
+        # Combine lists
+        # We need to map them to "Next 48h from Now".
+        # This requires knowing the start time of the "today" array.
+        # Tibber/Nordpool usually start at midnight.
+
+        combined_prices = []
+        if raw_today and isinstance(raw_today, list):
+            combined_prices.extend(raw_today)
+        if raw_tomorrow and isinstance(raw_tomorrow, list):
+            combined_prices.extend(raw_tomorrow)
+
+        # If no attributes, maybe 'forecast' list of dicts?
+        if not combined_prices:
+             raw_forecast = state.attributes.get("forecast")
+             if raw_forecast and isinstance(raw_forecast, list):
+                 for entry in raw_forecast:
+                     # standard 'native_value'
+                     val = entry.get("native_value") or entry.get("price") or entry.get("value")
+                     if val is not None:
+                         combined_prices.append(val)
+
+        if not combined_prices:
+             # Just use current state if available
+             try:
+                 val = float(state.state)
+                 prices_wh = [val * factor] * 48
+             except ValueError:
+                 pass
+             return prices_wh
+
+        # Now map to 48h from current hour
+        # Assumption: combined_prices starts at Today Midnight (00:00)
+        # We need values starting from Now.Hour
+        current_hour = dt_util.now().hour
+
+        # Create result array
+        final_prices = []
+        for i in range(48):
+             idx = current_hour + i
+             if idx < len(combined_prices):
+                 val = float(combined_prices[idx])
+                 final_prices.append(val * factor)
+             else:
+                 # Out of bounds, repeat last known
+                 if final_prices:
+                     final_prices.append(final_prices[-1])
+                 else:
+                     final_prices.append(0.0003)
+
+        return final_prices
+
+    def _get_ev_status(self):
+        """Get EV status if enabled."""
+        if not self.config_entry.data.get(CONF_EV_ENABLED):
+             return {"capacity_wh": 0}
+
+        entity_id = self.config_entry.data.get(CONF_ENTITY_EV_SOC)
+        capacity = self.config_entry.data.get(CONF_EV_CAPACITY, 50000)
+        max_charge = self.config_entry.data.get(CONF_EV_MAX_CHARGE_RATE, 11000)
+
+        soc = 50 # Default
+        if entity_id:
+            state = self.hass.states.get(entity_id)
+            if state:
+                try:
+                    soc = float(state.state)
+                except ValueError:
+                    pass
+
+        return {
+            "capacity_wh": capacity,
+            "charging_efficiency": 0.90,
+            "discharging_efficiency": 0.95,
+            "max_charge_power_w": max_charge,
+            "initial_soc_percentage": soc,
+            "min_soc_percentage": 5,
+            "max_soc_percentage": 100,
+            "device_id": "ev1"
+        }
+
+    def _get_dishwasher_data(self):
+        """Get controllable load data if enabled."""
+        if not self.config_entry.data.get(CONF_LOAD_ENABLED):
+             return {"consumption_wh": 0, "duration_h": 0}
+
+        return {
+            "consumption_wh": self.config_entry.data.get(CONF_LOAD_CONSUMPTION, 1000),
+            "duration_h": self.config_entry.data.get(CONF_LOAD_DURATION, 1),
+            "device_id": "additional_load_1"
+        }
+
+    def _build_eos_payload(self, soc, load_profile, pv_forecast, prices, ev_data):
         """Build the dictionary expected by EOS."""
         config = self.config_entry.data
 
-        # Basic Price stub - assuming flat rate if no sensor provided (future enhancement)
-        # 48 hours
-        prices = [0.30] * 48
-        feedin = [0.08] * 48
+        # Feedin Price - defaulting to 0.08 EUR/kWh -> 0.00008 EUR/Wh
+        feedin = [0.00008] * 48
 
         return {
             "ems": {
@@ -263,9 +398,8 @@ class EosConnectCoordinator(DataUpdateCoordinator):
                 "device_id": "inverter1",
                 "battery_id": "battery1"
             },
-            # Stubs for others
-            "eauto": {"capacity_wh": 0},
-            "dishwasher": {"consumption_wh": 0},
+            "eauto": ev_data,
+            "dishwasher": self._get_dishwasher_data(),
             "temperature_forecast": [20] * 48
         }
 

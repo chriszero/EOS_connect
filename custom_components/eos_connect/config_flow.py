@@ -23,6 +23,14 @@ from .const import (
     CONF_ENTITY_LOAD,
     CONF_ENTITY_PV_FORECAST,
     CONF_ENTITY_SOC,
+    CONF_ENTITY_PRICE,
+    CONF_EV_ENABLED,
+    CONF_ENTITY_EV_SOC,
+    CONF_EV_CAPACITY,
+    CONF_EV_MAX_CHARGE_RATE,
+    CONF_LOAD_ENABLED,
+    CONF_LOAD_CONSUMPTION,
+    CONF_LOAD_DURATION,
     CONF_CONTROL_CHARGE_LIMIT,
     CONF_CONTROL_DISCHARGE_LIMIT,
     CONF_CONTROL_MODE,
@@ -73,7 +81,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._config.update(user_input)
-            return await self.async_step_controls()
+            return await self.async_step_ev()
 
         schema = vol.Schema(
             {
@@ -86,12 +94,54 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_ENTITY_PV_FORECAST): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=["sensor", "weather"])
                 ),
+                vol.Optional(CONF_ENTITY_PRICE): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
             }
         )
 
         return self.async_show_form(
             step_id="sensors", data_schema=schema, errors=errors
         )
+
+    async def async_step_ev(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the EV step."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._config.update(user_input)
+            return await self.async_step_load()
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_EV_ENABLED, default=False): bool,
+                vol.Optional(CONF_ENTITY_EV_SOC): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_EV_CAPACITY, default=50000): int,
+                vol.Optional(CONF_EV_MAX_CHARGE_RATE, default=11000): int,
+            }
+        )
+        return self.async_show_form(step_id="ev", data_schema=schema, errors=errors)
+
+    async def async_step_load(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the Controllable Load step."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._config.update(user_input)
+            return await self.async_step_controls()
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_LOAD_ENABLED, default=False): bool,
+                vol.Optional(CONF_LOAD_CONSUMPTION, default=1000): int,
+                vol.Optional(CONF_LOAD_DURATION, default=2): int,
+            }
+        )
+        return self.async_show_form(step_id="load", data_schema=schema, errors=errors)
 
     async def async_step_controls(
         self, user_input: dict[str, Any] | None = None
