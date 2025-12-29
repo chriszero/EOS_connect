@@ -328,6 +328,7 @@ Refer to this table and details when editing your `config.yaml` and for troubles
   - `fronius_gen24`: Use the Fronius Gen24 inverter (enhanced V2 interface with firmware-based authentication for all firmware versions).
   - `fronius_gen24_legacy`: Use the Fronius Gen24 inverter (legacy V1 interface for corner cases).
   - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
+  - `homeassistant`: Use Home Assistant entities/services to control an inverter/battery (e.g., via ESPHome).
   - `default`: Disable inverter control (only display the target state).
 
 - **`inverter.address`**:  
@@ -340,6 +341,78 @@ Refer to this table and details when editing your `config.yaml` and for troubles
   The password for the inverter's local portal. (only needed for fronius_gen24/fronius_gen24_legacy)
   
   **Note for enhanced interface**: The default `fronius_gen24` interface automatically detects your firmware version and uses the appropriate authentication method. If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
+
+**For `inverter.type: homeassistant`:**
+
+- **`inverter.url`**:
+  URL for Home Assistant (e.g., `http://<ip>:8123`).
+
+- **`inverter.token`**:
+  Access token for Home Assistant.
+
+- **Service Configurations**:
+  You can define a list of service calls for each operating mode:
+  - `force_charge_services`: Executed when the system wants to force charge the battery (e.g., from grid).
+  - `avoid_discharge_services`: Executed when the system wants to prevent discharge (hold battery).
+  - `discharge_allowed_services`: Executed when normal operation (discharge allowed) is desired.
+  - `max_pv_charge_rate_services`: Executed to set the maximum charge power (DC side).
+
+  Each service entry can have:
+  - `service`: The service to call (e.g., `select.select_option`, `number.set_value`).
+  - `entity_id`: The entity ID to target (can also be inside `data`).
+  - `data`: A dictionary of data parameters for the service call.
+  - `value_key`: (Optional) If set, the dynamic power value (in Watts) will be injected into `data` using this key.
+
+  **Example for an ESPHome-based Marstek Battery:**
+
+  ```yaml
+  inverter:
+    type: homeassistant
+    url: http://192.168.1.100:8123
+    token: "your-long-lived-access-token"
+    max_grid_charge_rate: 2500
+    max_pv_charge_rate: 2500
+
+    force_charge_services:
+      # 1. Set mode to Manual
+      - service: select.select_option
+        entity_id: select.marstek_m1_betriebsmodus
+        data:
+          option: "Manuell"
+      # 2. Set target charge power (inject dynamic value into 'value')
+      - service: number.set_value
+        entity_id: number.marstek_m1_ziel_leistung_manuell
+        value_key: value
+      # 3. Ensure discharge is disabled
+      - service: number.set_value
+        entity_id: number.marstek_m1_max_entladeleistung_limit
+        data:
+          value: 0
+
+    avoid_discharge_services:
+      # Set discharge limit to 0
+      - service: number.set_value
+        entity_id: number.marstek_m1_max_entladeleistung_limit
+        data:
+          value: 0
+      # Ensure forced operation is stopped
+      - service: select.select_option
+        entity_id: select.marstek_m1_erzwungene_operation
+        data:
+          option: "Stop"
+
+    discharge_allowed_services:
+      # Set mode to Anti-Feed-In or AI-Mode
+      - service: select.select_option
+        entity_id: select.marstek_m1_betriebsmodus
+        data:
+          option: "Anti-Feed-In"
+      # Allow full discharge
+      - service: number.set_value
+        entity_id: number.marstek_m1_max_entladeleistung_limit
+        data:
+          value: 2500
+  ```
 
 - **`inverter.max_grid_charge_rate`**:  
   The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
