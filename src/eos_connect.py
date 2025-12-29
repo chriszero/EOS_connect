@@ -21,6 +21,7 @@ from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
 from interfaces.inverter_fronius_v2 import FroniusWRV2
+from interfaces.inverter_homeassistant import InverterHA
 from interfaces.evcc_interface import EvccInterface
 from interfaces.optimization_interface import OptimizationInterface
 from interfaces.price_interface import PriceInterface
@@ -180,6 +181,10 @@ elif inverter_type == "fronius_gen24_legacy":
         "password": config_manager.config["inverter"]["password"],
     }
     inverter_interface = FroniusWR(inverter_config)
+elif inverter_type == "homeassistant":
+    logger.info("[Inverter] Inverter type %s - using Home Assistant interface.", inverter_type)
+    inverter_config = config_manager.config["inverter"]
+    inverter_interface = InverterHA(inverter_config)
 elif inverter_type == "evcc":
     logger.info(
         "[Inverter] Inverter type %s - using the universal evcc external battery control.",
@@ -1123,8 +1128,11 @@ def change_control_state():
     """
     inverter_fronius_en = False
     inverter_evcc_en = False
+    inverter_ha_en = False
     if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
         inverter_fronius_en = True
+    elif inverter_type == "homeassistant":
+        inverter_ha_en = True
     elif config_manager.config["inverter"]["type"] == "evcc":
         inverter_evcc_en = True
 
@@ -1194,6 +1202,8 @@ def change_control_state():
         if current_overall_state == 0:
             if inverter_fronius_en:
                 inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
+            elif inverter_ha_en:
+                inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("force_charge")
             logger.info(
@@ -1204,6 +1214,8 @@ def change_control_state():
         # MODE_AVOID_DISCHARGE
         elif current_overall_state == 1:
             if inverter_fronius_en:
+                inverter_interface.set_mode_avoid_discharge()
+            elif inverter_ha_en:
                 inverter_interface.set_mode_avoid_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("avoid_discharge")
@@ -1216,6 +1228,9 @@ def change_control_state():
             if inverter_fronius_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
+            elif inverter_ha_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("discharge_allowed")
             logger.info(
@@ -1226,6 +1241,8 @@ def change_control_state():
         elif current_overall_state == 3:
             if inverter_fronius_en:
                 inverter_interface.set_mode_avoid_discharge()
+            elif inverter_ha_en:
+                inverter_interface.set_mode_avoid_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("avoid_discharge")
             logger.info(
@@ -1235,6 +1252,9 @@ def change_control_state():
         # MODE_DISCHARGE_ALLOWED_EVCC_PV
         elif current_overall_state == 4:
             if inverter_fronius_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
+            elif inverter_ha_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
@@ -1248,6 +1268,9 @@ def change_control_state():
             if inverter_fronius_en:
                 inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
                 inverter_interface.set_mode_allow_discharge()
+            elif inverter_ha_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("discharge_allowed")
             logger.info(
@@ -1257,6 +1280,8 @@ def change_control_state():
         # MODE_CHARGE_FROM_GRID_EVCC_FAST
         elif current_overall_state == 6:
             if inverter_fronius_en:
+                inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
+            elif inverter_ha_en:
                 inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("force_charge")
