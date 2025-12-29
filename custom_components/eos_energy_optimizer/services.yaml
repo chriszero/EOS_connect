@@ -1,0 +1,123 @@
+set_mode:
+  name: Set Mode
+  description: Set the inverter operating mode.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID (optional if only one instance exists)
+      example: "abc123def456"
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      description: The mode to set
+      example: "auto"
+      required: true
+      selector:
+        select:
+          options:
+            - "auto"
+            - "charge_from_grid"
+            - "avoid_discharge"
+            - "discharge_allowed"
+
+set_override:
+  name: Set Override
+  description: Set a temporary mode override.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID (optional if only one instance exists)
+      example: "abc123def456"
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      description: The mode to override with
+      example: "charge_from_grid"
+      required: true
+      selector:
+        select:
+          options:
+            - "charge_from_grid"
+            - "avoid_discharge"
+            - "discharge_allowed"
+    duration_minutes:
+      name: Duration
+      description: Duration of the override in minutes
+      example: 60
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: "min"
+    charge_power:
+      name: Charge Power
+      description: Charge power in watts (for charge_from_grid mode)
+      example: 3000
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 50000
+          unit_of_measurement: "W"
+
+clear_override:
+  name: Clear Override
+  description: Clear the current mode override.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID (optional if only one instance exists)
+      example: "abc123def456"
+      required: false
+      selector:
+        text:
+
+refresh_optimization:
+  name: Refresh Optimization
+  description: Manually trigger an optimization request.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID (optional if only one instance exists)
+      example: "abc123def456"
+      required: false
+      selector:
+        text:
+
+set_soc_limits:
+  name: Set SOC Limits
+  description: Set battery SOC limits.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID (optional if only one instance exists)
+      example: "abc123def456"
+      required: false
+      selector:
+        text:
+    min_soc:
+      name: Minimum SOC
+      description: Minimum SOC percentage
+      example: 10
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 50
+          unit_of_measurement: "%"
+    max_soc:
+      name: Maximum SOC
+      description: Maximum SOC percentage
+      example: 95
+      required: true
+      selector:
+        number:
+          min: 50
+          max: 100
+          unit_of_measurement: "%"
