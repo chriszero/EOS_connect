@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
+from packaging import version
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
@@ -52,6 +53,9 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# EOS optimization request duration (48 hours)
+EOS_TGT_DURATION = 48
 
 
 @dataclass
@@ -111,7 +115,10 @@ class EOSData:
     last_optimization: datetime | None = None
     next_optimization: datetime | None = None
     optimization_state: str = "unknown"
-    version: str = "1.0.0"
+    eos_version: str = "0.0.1"
+    last_start_solution: list | None = None
+    home_appliance_released: bool = False
+    home_appliance_start_hour: int | None = None
 
 
 class EOSApiClient:
@@ -124,6 +131,8 @@ class EOSApiClient:
         self._session: aiohttp.ClientSession | None = None
         self._data = EOSData()
         self._lock = asyncio.Lock()
+        self._eos_version: str = "0.0.1"
+        self._time_frame_base: int = config.get(CONF_TIME_FRAME, DEFAULT_TIME_FRAME)
 
     @property
     def data(self) -> EOSData:
@@ -137,12 +146,42 @@ class EOSApiClient:
         return self._session
 
     async def async_test_connection(self) -> bool:
-        """Test connection to EOS server."""
+        """Test connection to EOS server and retrieve version."""
         try:
             session = await self._get_session()
             url = self._get_eos_url()
+
+            # Try v1/health endpoint first (EOS >= 0.1.0)
+            try:
+                async with session.get(
+                    f"{url}/v1/health",
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        eos_version = data.get("version", "unknown")
+                        if eos_version == "unknown" and data.get("status") == "alive":
+                            eos_version = "0.0.2"
+                        self._eos_version = eos_version
+                        self._data.eos_version = eos_version
+                        _LOGGER.info("Connected to EOS server version: %s", eos_version)
+                        return True
+                    elif resp.status == 404:
+                        # Old EOS version without /v1/health
+                        self._eos_version = "0.0.1"
+                        self._data.eos_version = "0.0.1"
+                        _LOGGER.info("Connected to EOS server (legacy version 0.0.1)")
+                        return True
+            except aiohttp.ClientError:
+                pass
+
+            # Fallback: try base URL
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                return resp.status in (200, 404)  # Server is reachable
+                if resp.status in (200, 404):
+                    self._eos_version = "0.0.1"
+                    self._data.eos_version = "0.0.1"
+                    return True
+                return False
         except Exception as e:
             _LOGGER.error("Connection test failed: %s", e)
             return False
@@ -156,6 +195,14 @@ class EOSApiClient:
         else:
             port = self.config.get(CONF_EOS_PORT, DEFAULT_EOS_PORT)
         return f"http://{server}:{port}"
+
+    def is_eos_version_at_least(self, version_string: str) -> bool:
+        """Check if the EOS version is at least the given version."""
+        try:
+            return version.parse(self._eos_version) >= version.parse(version_string)
+        except Exception:
+            _LOGGER.warning("Cannot compare EOS versions: %s vs %s", self._eos_version, version_string)
+            return False
 
     async def async_update(self) -> EOSData:
         """Update all data."""
@@ -177,24 +224,39 @@ class EOSApiClient:
         return self._data
 
     async def async_run_optimization(self) -> OptimizationResult:
-        """Run optimization request to EOS server."""
+        """Run optimization request to EOS server.
+
+        Uses the /optimize endpoint with start_hour parameter for EOS,
+        or /api/optimize for EVopt backend.
+        """
         async with self._lock:
             try:
+                # Update data before optimization
+                await self._update_battery_soc()
+                await self._update_load_data()
+                await self._update_pv_forecast()
+                await self._update_prices()
+                self._update_battery_state()
+
                 request_data = await self._build_optimization_request()
                 session = await self._get_session()
 
                 source = self.config.get(CONF_EOS_SOURCE, "eos_server")
+                current_hour = dt_util.now().hour
+
                 if source == EOS_SOURCE_EVOPT:
                     url = f"{self._get_eos_url()}/api/optimize"
                 else:
-                    url = f"{self._get_eos_url()}/optimize"
+                    # EOS server with start_hour parameter
+                    url = f"{self._get_eos_url()}/optimize?start_hour={current_hour}"
 
                 _LOGGER.debug("Sending optimization request to %s", url)
 
                 async with session.post(
                     url,
                     json=request_data,
-                    timeout=aiohttp.ClientTimeout(total=120),
+                    headers={"accept": "application/json", "Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=180),  # EOS can take 2-3 minutes
                 ) as resp:
                     if resp.status == 200:
                         response_data = await resp.json()
@@ -205,12 +267,26 @@ class EOSApiClient:
                         self._data.next_optimization = dt_util.now() + timedelta(minutes=refresh_minutes)
                         self._data.optimization_state = "ok"
 
+                        _LOGGER.info(
+                            "Optimization completed: cost=%.2f€, ac_charge=%s, discharge=%s",
+                            self._data.optimization.cost_total,
+                            self._data.control.ac_charge_demand,
+                            self._data.control.discharge_allowed
+                        )
+
                         # Fire event for automations
                         self._fire_control_event()
                     else:
-                        _LOGGER.error("Optimization request failed: %s", resp.status)
+                        response_text = await resp.text()
+                        _LOGGER.error("Optimization request failed: %s - %s", resp.status, response_text)
                         self._data.optimization_state = "error"
 
+            except asyncio.TimeoutError:
+                _LOGGER.error("Optimization request timed out")
+                self._data.optimization_state = "timeout"
+            except aiohttp.ClientError as e:
+                _LOGGER.error("Connection error during optimization: %s", e)
+                self._data.optimization_state = "connection_error"
             except Exception as e:
                 _LOGGER.error("Optimization failed: %s", e)
                 self._data.optimization_state = "error"
@@ -571,9 +647,12 @@ class EOSApiClient:
             self._data.battery.dynamic_max_charge_power = max_charge
 
     async def _build_optimization_request(self) -> dict[str, Any]:
-        """Build optimization request for EOS server."""
+        """Build optimization request for EOS server.
+
+        Format follows the EOS API specification:
+        https://akkudoktor-eos.readthedocs.io/
+        """
         now = dt_util.now()
-        time_frame = self.config.get(CONF_TIME_FRAME, DEFAULT_TIME_FRAME)
 
         capacity = self.config.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY)
         charge_eff = self.config.get(CONF_BATTERY_CHARGE_EFFICIENCY, DEFAULT_BATTERY_EFFICIENCY)
@@ -582,52 +661,100 @@ class EOSApiClient:
         min_soc = self.config.get(CONF_BATTERY_MIN_SOC, DEFAULT_BATTERY_MIN_SOC)
         max_soc = self.config.get(CONF_BATTERY_MAX_SOC, DEFAULT_BATTERY_MAX_SOC)
         feed_in = self.config.get(CONF_FEED_IN_PRICE, DEFAULT_FEED_IN_PRICE)
+        max_pv_charge = self.config.get(CONF_MAX_PV_CHARGE_RATE, max_charge)
 
+        # Ensure we have enough data points
+        pv_forecast = self._data.pv_forecast[:EOS_TGT_DURATION] if self._data.pv_forecast else [0] * EOS_TGT_DURATION
+        prices = self._data.prices[:EOS_TGT_DURATION] if self._data.prices else [0.30] * EOS_TGT_DURATION
+        load_profile = self._data.load_profile[:EOS_TGT_DURATION] if self._data.load_profile else [400] * EOS_TGT_DURATION
+
+        # Pad arrays if needed
+        while len(pv_forecast) < EOS_TGT_DURATION:
+            pv_forecast.append(0)
+        while len(prices) < EOS_TGT_DURATION:
+            prices.append(prices[-1] if prices else 0.30)
+        while len(load_profile) < EOS_TGT_DURATION:
+            load_profile.append(load_profile[-1] if load_profile else 400)
+
+        # EMS data - core optimization inputs
         ems = {
-            "pv_prognose_wh": self._data.pv_forecast[:48],
-            "strompreis_euro_pro_wh": [p / 1000 for p in self._data.prices[:48]],
-            "einspeiseverguetung_euro_pro_wh": [feed_in / 1000] * 48,
-            "gesamtlast": self._data.load_profile[:48],
+            "pv_prognose_wh": pv_forecast,
+            "strompreis_euro_pro_wh": [p / 1000 for p in prices],  # Convert €/kWh to €/Wh
+            "einspeiseverguetung_euro_pro_wh": [feed_in / 1000] * EOS_TGT_DURATION,
+            "gesamtlast": load_profile,
         }
 
+        # Battery configuration
         pv_akku = {
-            "device_id": "battery1",
             "capacity_wh": capacity,
             "charging_efficiency": charge_eff,
             "discharging_efficiency": discharge_eff,
             "max_charge_power_w": max_charge,
-            "initial_soc_percentage": self._data.battery.soc,
+            "initial_soc_percentage": round(self._data.battery.soc),
             "min_soc_percentage": min_soc,
             "max_soc_percentage": max_soc,
         }
 
+        # Add device_id for EOS >= 0.0.2
+        if self.is_eos_version_at_least("0.0.2"):
+            pv_akku = {"device_id": "battery1", **pv_akku}
+
+        # Inverter configuration
         inverter = {
-            "device_id": "inverter1",
-            "max_power_wh": max_charge,
-            "battery_id": "battery1",
+            "max_power_wh": max_pv_charge,
         }
+
+        # Add device_id and battery_id for EOS >= 0.0.2
+        if self.is_eos_version_at_least("0.0.2"):
+            inverter = {"device_id": "inverter1", **inverter}
+            inverter["battery_id"] = "battery1"
 
         request = {
             "ems": ems,
             "pv_akku": pv_akku,
             "inverter": inverter,
-            "timestamp": now.isoformat(),
         }
 
-        if time_frame != DEFAULT_TIME_FRAME:
-            request["time_frame"] = time_frame
+        # Add start_solution for better optimization convergence
+        if self._data.last_start_solution:
+            request["start_solution"] = self._data.last_start_solution
 
         return request
 
     def _parse_optimization_response(self, response: dict[str, Any]) -> OptimizationResult:
-        """Parse optimization response from EOS server."""
+        """Parse optimization response from EOS server.
+
+        Response format from EOS:
+        {
+            "ac_charge": [0-1 values for each hour],
+            "dc_charge": [0-1 values for each hour],
+            "discharge_allowed": [0/1 values for each hour],
+            "start_solution": [...],
+            "washingstart": hour number or null,
+            "result": {
+                "akku_soc_pro_stunde": [...],
+                "Gesamtkosten_Euro": float,
+                "Gesamt_Verluste": float,
+                "Netzbezug_Wh_pro_Stunde": [...],
+                "Netzeinspeisung_Wh_pro_Stunde": [...],
+                "Last_Wh_pro_Stunde": [...]
+            }
+        }
+        """
         result = OptimizationResult()
         result.raw_response = response
 
-        result.ac_charge = response.get("ac_charge", [0] * 48)
-        result.dc_charge = response.get("dc_charge", [1] * 48)
-        result.discharge_allowed = [bool(x) for x in response.get("discharge_allowed", [1] * 48)]
+        # Check for error in response
+        if "error" in response:
+            _LOGGER.error("EOS optimization error: %s", response.get("error"))
+            return result
 
+        # Parse charging schedules
+        result.ac_charge = response.get("ac_charge", [0] * EOS_TGT_DURATION)
+        result.dc_charge = response.get("dc_charge", [1] * EOS_TGT_DURATION)
+        result.discharge_allowed = [bool(x) for x in response.get("discharge_allowed", [1] * EOS_TGT_DURATION)]
+
+        # Parse result details
         if "result" in response:
             res = response["result"]
             result.soc_forecast = res.get("akku_soc_pro_stunde", [])
@@ -637,7 +764,17 @@ class EOSApiClient:
             result.grid_export = res.get("Netzeinspeisung_Wh_pro_Stunde", [])
             result.load_forecast = res.get("Last_Wh_pro_Stunde", [])
 
+        # Store start_solution for next optimization run
+        if "start_solution" in response and len(response["start_solution"]) > 1:
+            self._data.last_start_solution = response["start_solution"]
+
+        # Parse home appliance scheduling
         result.home_appliance_start_hour = response.get("washingstart")
+        if result.home_appliance_start_hour is not None:
+            current_hour = dt_util.now().hour
+            self._data.home_appliance_start_hour = result.home_appliance_start_hour
+            self._data.home_appliance_released = (result.home_appliance_start_hour == current_hour)
+
         result.timestamp = dt_util.now()
 
         return result

@@ -3,18 +3,27 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/chriszero/eos_energy_optimizer.svg)](https://github.com/chriszero/eos_energy_optimizer/releases)
 
-Home Assistant Custom Integration for intelligent energy management and optimization using the EOS (Energy Optimization System) backend.
+Home Assistant Custom Integration for intelligent energy management and optimization using the [Akkudoktor EOS](https://github.com/Akkudoktor-EOS/EOS) (Energy Optimization System) backend.
 
 ## Features
 
 - **Energy Optimization**: Periodically requests optimization decisions from an EOS or EVopt backend
 - **Battery Management**: Monitors SOC, calculates usable energy, and controls charging/discharging
-- **PV Forecasting**: Integrates with Akkudoktor, Open-Meteo, and Forecast.Solar for solar production forecasts
-- **Dynamic Pricing**: Supports Tibber, Akkudoktor, and fixed pricing for electricity costs
+- **PV Forecasting**: Uses existing Home Assistant sensors from Solcast, Forecast.Solar, or Open-Meteo Solar
+- **Dynamic Pricing**: Uses existing Home Assistant sensors from Tibber, ENTSO-E, Nordpool, EPEX Spot, or Awattar
 - **Native HA Integration**: All data exposed as Home Assistant entities with full history support
+- **Lovelace Dashboard**: Pre-built dashboard with ApexCharts for visualization
 - **Control via Entities**: Use select, number, and button entities to control the system
 - **Services**: Comprehensive services for automation integration
 - **Events**: Fires events on control updates for custom automations
+
+## Requirements
+
+- Home Assistant 2024.1.0 or newer
+- An EOS or EVopt optimization server running and accessible
+- A PV forecast sensor (Solcast, Forecast.Solar, or Open-Meteo Solar integration)
+- A price sensor (Tibber, ENTSO-E, Nordpool, EPEX Spot, or Awattar integration)
+- Optional: HACS [apexcharts-card](https://github.com/RomRider/apexcharts-card) for the dashboard
 
 ## Installation
 
@@ -39,10 +48,10 @@ Home Assistant Custom Integration for intelligent energy management and optimiza
 2. Click "Add Integration"
 3. Search for "EOS Energy Optimizer"
 4. Follow the setup wizard:
-   - **EOS Server**: Configure your EOS/EVopt server connection
+   - **EOS Server**: Configure your EOS/EVopt server connection (default: localhost:8503)
    - **Battery**: Set your battery capacity, power limits, and SOC sensor
-   - **PV System**: Configure your solar panels for forecasting
-   - **Pricing**: Set up your electricity price source
+   - **PV Forecast**: Select a PV forecast sensor from Solcast, Forecast.Solar, or Open-Meteo Solar
+   - **Pricing**: Select a price sensor from Tibber, ENTSO-E, Nordpool, EPEX Spot, or Awattar
    - **Load**: Configure your household power consumption sensor
 
 ## Entities
@@ -182,38 +191,89 @@ automation:
           message: "Battery SOC is {{ states('sensor.eos_battery_soc') }}%"
 ```
 
-## Dashboard Example
+## Dashboard
+
+A pre-built Lovelace dashboard is available in `lovelace/eos_dashboard.yaml`. It includes:
+
+- **24-hour Energy Overview**: PV forecast, grid import, charging schedule, prices, and SOC
+- **Battery Gauge**: Visual SOC with color-coded severity
+- **Control Panel**: Mode selection, SOC limits, and action buttons
+- **48-hour Price Chart**: Electricity prices visualization
+- **Detailed Charts**: PV forecast, SOC forecast, grid import/export, charge demands
+
+### Dashboard Installation
+
+1. Install [apexcharts-card](https://github.com/RomRider/apexcharts-card) via HACS
+2. Copy the content from `lovelace/eos_dashboard.yaml`
+3. Create a new dashboard or add a view in an existing dashboard
+4. Paste the YAML configuration
+5. Adjust entity IDs if needed (default prefix: `eos_energy_optimizer`)
+
+### Simple Dashboard Example
 
 ```yaml
 type: entities
 title: EOS Energy Optimizer
 entities:
-  - entity: sensor.eos_inverter_mode
-  - entity: sensor.eos_battery_soc
-  - entity: binary_sensor.eos_discharge_allowed
-  - entity: sensor.eos_ac_charge_demand
-  - entity: sensor.eos_current_price
-  - entity: select.eos_inverter_mode_control
-  - entity: button.eos_refresh_optimization
+  - entity: sensor.eos_energy_optimizer_inverter_mode
+  - entity: sensor.eos_energy_optimizer_battery_soc
+  - entity: binary_sensor.eos_energy_optimizer_discharge_allowed
+  - entity: sensor.eos_energy_optimizer_ac_charge_demand
+  - entity: sensor.eos_energy_optimizer_current_price
+  - entity: select.eos_energy_optimizer_inverter_mode_control
+  - entity: button.eos_energy_optimizer_refresh_optimization
 ```
 
-## Requirements
+## Supported PV Forecast Sensors
 
-- Home Assistant 2024.1.0 or newer
-- An EOS or EVopt optimization server running and accessible
-- Optional: Tibber account for dynamic pricing
+The integration reads PV forecasts from existing Home Assistant sensors:
+
+| Integration | Sensor Attributes |
+|-------------|-------------------|
+| **Solcast** | `DetailedForecast`, `detailedHourly` with `period_start`, `pv_estimate` |
+| **Forecast.Solar** | `watt_hours` dict or `forecast` list |
+| **Open-Meteo Solar** | `forecast` list with `period_start`, `power` |
+
+## Supported Price Sensors
+
+The integration reads electricity prices from existing Home Assistant sensors:
+
+| Integration | Sensor Attributes |
+|-------------|-------------------|
+| **Tibber** | `prices` list with `from`/`startsAt`, `price`/`total` |
+| **Nordpool** | `prices_today`, `prices_tomorrow` or `raw_today`, `raw_tomorrow` |
+| **ENTSO-E** | `data` list with `time`, `price` (converts €/MWh to €/kWh) |
+| **EPEX Spot** | Similar to Nordpool format |
+| **Awattar** | Similar to Tibber format |
 
 ## Troubleshooting
 
 ### Cannot connect to EOS server
-- Verify the server address and port
-- Check that the EOS server is running
+- Verify the server address and port (default: 8503 for EOS, 8504 for EVopt)
+- Check that the EOS server is running: `http://your-server:8503/v1/health`
 - Ensure network connectivity between HA and the EOS server
 
-### Optimization failing
+### Optimization failing or timing out
+- EOS optimization can take 2-3 minutes - this is normal
 - Check the Home Assistant logs for error details
 - Verify your battery and PV configuration
 - Ensure the load sensor is providing valid data
+- Check that PV forecast and price sensors have data in their attributes
+
+### No PV forecast data
+- Ensure your PV forecast integration is set up correctly (Solcast, Forecast.Solar, etc.)
+- Check that the sensor has forecast data in its attributes
+- The integration looks for: `DetailedForecast`, `forecast`, `watt_hours` attributes
+
+### No price data
+- Ensure your price integration is set up correctly (Tibber, Nordpool, etc.)
+- Check that the sensor has price data in its attributes
+- For ENTSO-E: Prices in €/MWh are automatically converted to €/kWh
+
+### Dashboard not working
+- Install `apexcharts-card` from HACS
+- Check that entity IDs match (use `eos_energy_optimizer_` prefix)
+- Verify sensors have `forecast_48h` or `prices_48h` in their attributes
 
 ## License
 
@@ -221,4 +281,6 @@ MIT License - see LICENSE file for details.
 
 ## Credits
 
-Based on [EOS_connect](https://github.com/chriszero/EOS_connect) addon.
+- Based on [EOS_connect](https://github.com/ohAnd/EOS_connect) addon
+- Uses [Akkudoktor EOS](https://github.com/Akkudoktor-EOS/EOS) backend
+- Documentation: [akkudoktor-eos.readthedocs.io](https://akkudoktor-eos.readthedocs.io/)

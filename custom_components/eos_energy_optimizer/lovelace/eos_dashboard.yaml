@@ -1,0 +1,398 @@
+# EOS Energy Optimizer - Lovelace Dashboard Configuration
+#
+# Requirements:
+# - HACS: apexcharts-card (https://github.com/RomRider/apexcharts-card)
+# - HACS: mushroom-cards (optional, for better styling)
+#
+# Usage:
+# 1. Install apexcharts-card via HACS
+# 2. Copy this content into a new dashboard view or create a new dashboard
+# 3. Adjust entity IDs to match your installation
+
+title: EOS Energy Optimizer
+views:
+  - title: Energie Übersicht
+    path: eos-overview
+    icon: mdi:solar-power
+    cards:
+      # Header Row - Current Status
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: sensor.eos_energy_optimizer_inverter_mode
+            name: Modus
+            icon: mdi:solar-power
+          - type: entity
+            entity: sensor.eos_energy_optimizer_battery_soc
+            name: Batterie
+            icon: mdi:battery
+          - type: entity
+            entity: sensor.eos_energy_optimizer_current_price
+            name: Strompreis
+            icon: mdi:currency-eur
+          - type: entity
+            entity: binary_sensor.eos_energy_optimizer_discharge_allowed
+            name: Entladung
+            icon: mdi:battery-arrow-down
+
+      # Main Chart - 24h Overview
+      - type: custom:apexcharts-card
+        header:
+          title: 24-Stunden Energie-Prognose
+          show: true
+        graph_span: 24h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 350px
+          legend:
+            show: true
+            position: bottom
+          tooltip:
+            x:
+              format: "HH:mm"
+        yaxis:
+          - id: power
+            min: 0
+            apex_config:
+              title:
+                text: "Leistung (W)"
+          - id: price
+            opposite: true
+            apex_config:
+              title:
+                text: "Preis (€/kWh)"
+          - id: soc
+            opposite: true
+            min: 0
+            max: 100
+            apex_config:
+              title:
+                text: "SOC (%)"
+        series:
+          - entity: sensor.eos_energy_optimizer_current_pv_forecast
+            name: PV Prognose
+            type: area
+            yaxis_id: power
+            color: "#FFC107"
+            opacity: 0.3
+            stroke_width: 2
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.slice(0, 24).map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+          - entity: sensor.eos_energy_optimizer_grid_import_forecast
+            name: Netzbezug
+            type: line
+            yaxis_id: power
+            color: "#F44336"
+            stroke_width: 2
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.slice(0, 24).map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+          - entity: sensor.eos_energy_optimizer_ac_charge_demand
+            name: Netzladen
+            type: column
+            yaxis_id: power
+            color: "#2196F3"
+            opacity: 0.7
+          - entity: sensor.eos_energy_optimizer_current_price
+            name: Strompreis
+            type: line
+            yaxis_id: price
+            color: "#9C27B0"
+            stroke_width: 2
+            stroke_curve: stepline
+            data_generator: |
+              const prices = entity.attributes.prices_48h || [];
+              const now = new Date();
+              return prices.slice(0, 24).map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+          - entity: sensor.eos_energy_optimizer_soc_forecast
+            name: SOC Prognose
+            type: line
+            yaxis_id: soc
+            color: "#4CAF50"
+            stroke_width: 3
+            stroke_curve: smooth
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.slice(0, 24).map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+
+      # Charge/Discharge Schedule
+      - type: custom:apexcharts-card
+        header:
+          title: Lade-/Entlade-Plan
+          show: true
+        graph_span: 24h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 200px
+            type: heatmap
+          dataLabels:
+            enabled: false
+        series:
+          - entity: sensor.eos_energy_optimizer_ac_charge_demand
+            name: Netzladen
+            type: column
+            color: "#2196F3"
+          - entity: sensor.eos_energy_optimizer_dc_charge_demand
+            name: PV-Laden
+            type: column
+            color: "#FFC107"
+
+      # Battery and Control Panel
+      - type: horizontal-stack
+        cards:
+          # Battery Status
+          - type: vertical-stack
+            cards:
+              - type: gauge
+                entity: sensor.eos_energy_optimizer_battery_soc
+                name: Batterie SOC
+                min: 0
+                max: 100
+                severity:
+                  green: 50
+                  yellow: 20
+                  red: 10
+              - type: entities
+                entities:
+                  - entity: sensor.eos_energy_optimizer_battery_usable_energy
+                    name: Nutzbare Energie
+                  - entity: sensor.eos_energy_optimizer_battery_dynamic_max_charge
+                    name: Max. Ladeleistung
+
+          # Control Panel
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Steuerung
+                entities:
+                  - entity: select.eos_energy_optimizer_inverter_mode_control
+                    name: Modus
+                  - entity: number.eos_energy_optimizer_min_soc
+                    name: Min. SOC
+                  - entity: number.eos_energy_optimizer_max_soc
+                    name: Max. SOC
+              - type: horizontal-stack
+                cards:
+                  - type: button
+                    entity: button.eos_energy_optimizer_refresh_optimization
+                    name: Aktualisieren
+                    icon: mdi:refresh
+                    tap_action:
+                      action: call-service
+                      service: button.press
+                      service_data:
+                        entity_id: button.eos_energy_optimizer_refresh_optimization
+                  - type: button
+                    entity: button.eos_energy_optimizer_clear_override
+                    name: Override löschen
+                    icon: mdi:close-circle
+                    tap_action:
+                      action: call-service
+                      service: button.press
+                      service_data:
+                        entity_id: button.eos_energy_optimizer_clear_override
+
+      # Price Chart
+      - type: custom:apexcharts-card
+        header:
+          title: Strompreise (48h)
+          show: true
+        graph_span: 48h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 200px
+          stroke:
+            curve: stepline
+        series:
+          - entity: sensor.eos_energy_optimizer_current_price
+            name: Strompreis
+            type: area
+            color: "#9C27B0"
+            opacity: 0.3
+            data_generator: |
+              const prices = entity.attributes.prices_48h || [];
+              const now = new Date();
+              return prices.map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+
+      # Status Cards
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: binary_sensor.eos_energy_optimizer_charging_from_grid
+            name: Laden vom Netz
+            icon: mdi:transmission-tower-import
+          - type: entity
+            entity: binary_sensor.eos_energy_optimizer_override_active
+            name: Override aktiv
+            icon: mdi:hand-back-left
+          - type: entity
+            entity: binary_sensor.eos_energy_optimizer_optimization_ok
+            name: Optimierung OK
+            icon: mdi:check-circle
+          - type: entity
+            entity: sensor.eos_energy_optimizer_home_appliance_start
+            name: Hausgerät Start
+            icon: mdi:washing-machine
+
+      # Optimization Details
+      - type: entities
+        title: Optimierung Details
+        entities:
+          - entity: sensor.eos_energy_optimizer_optimization_cost
+            name: Gesamtkosten
+            icon: mdi:currency-eur
+          - entity: sensor.eos_energy_optimizer_optimization_losses
+            name: Verluste
+            icon: mdi:lightning-bolt-outline
+          - entity: sensor.eos_energy_optimizer_last_optimization
+            name: Letzte Optimierung
+            icon: mdi:clock-check
+          - entity: sensor.eos_energy_optimizer_next_optimization
+            name: Nächste Optimierung
+            icon: mdi:clock-fast
+          - entity: sensor.eos_energy_optimizer_optimization_state
+            name: Status
+            icon: mdi:state-machine
+
+  # Second View - Detailed Charts
+  - title: Details
+    path: eos-details
+    icon: mdi:chart-line
+    cards:
+      # 48h PV Forecast
+      - type: custom:apexcharts-card
+        header:
+          title: PV-Prognose (48h)
+          show: true
+        graph_span: 48h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 300px
+        series:
+          - entity: sensor.eos_energy_optimizer_current_pv_forecast
+            name: PV Ertrag
+            type: area
+            color: "#FFC107"
+            opacity: 0.5
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+
+      # SOC Forecast
+      - type: custom:apexcharts-card
+        header:
+          title: SOC-Prognose (48h)
+          show: true
+        graph_span: 48h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 250px
+        yaxis:
+          - min: 0
+            max: 100
+        series:
+          - entity: sensor.eos_energy_optimizer_soc_forecast
+            name: SOC
+            type: area
+            color: "#4CAF50"
+            opacity: 0.3
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+
+      # Grid Import/Export
+      - type: custom:apexcharts-card
+        header:
+          title: Netzbezug / Einspeisung (48h)
+          show: true
+        graph_span: 48h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 250px
+            stacked: false
+        series:
+          - entity: sensor.eos_energy_optimizer_grid_import_forecast
+            name: Netzbezug
+            type: column
+            color: "#F44336"
+            opacity: 0.7
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val];
+              });
+          - entity: sensor.eos_energy_optimizer_grid_export_forecast
+            name: Einspeisung
+            type: column
+            color: "#4CAF50"
+            opacity: 0.7
+            data_generator: |
+              const forecast = entity.attributes.forecast_48h || [];
+              const now = new Date();
+              return forecast.map((val, i) => {
+                const time = new Date(now.getTime() + i * 3600000);
+                return [time.getTime(), val * -1];
+              });
+
+      # Charge Demands
+      - type: custom:apexcharts-card
+        header:
+          title: Ladebedarf (24h)
+          show: true
+        graph_span: 24h
+        span:
+          start: hour
+        apex_config:
+          chart:
+            height: 200px
+            stacked: true
+        series:
+          - entity: sensor.eos_energy_optimizer_ac_charge_demand
+            name: Netzladen
+            type: column
+            color: "#2196F3"
+          - entity: sensor.eos_energy_optimizer_dc_charge_demand
+            name: PV-Laden
+            type: column
+            color: "#FFC107"
