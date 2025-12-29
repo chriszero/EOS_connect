@@ -24,7 +24,64 @@ Integration to connect Home Assistant with the Akkudoktor EOS optimization serve
 5.  **Step 3: Control Mappings**:
     *   **Charge Limit Entity**: A `number` entity to set the grid charge limit (Watts).
     *   **Discharge Limit Entity**: A `number` entity to set the discharge limit (Watts).
-    *   **Mode Entity**: A `select` or `switch` to force "Charge" or "Hold".
+    *   **Mode Entity**: A `select` to force "Charge" or "Hold".
+    *   **EV Connected Entity** (Optional): A binary sensor to tell if the car is plugged in.
+
+## Visualization (ApexCharts)
+
+You can visualize the EOS plan using the **ApexCharts Card** (available in HACS).
+Here is an example configuration using the `sensor.eos_connect_plan_data` sensor:
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: EOS Optimization Plan
+  show_states: true
+  colorize_states: true
+graph_span: 48h
+span:
+  start: minute
+series:
+  - entity: sensor.eos_connect_plan_data
+    name: PV Forecast
+    data_generator: |
+      return entity.attributes.time.map((t, i) => {
+        return [new Date(t).getTime(), entity.attributes.pv_forecast[i]];
+      });
+    type: area
+    color: yellow
+    opacity: 0.3
+
+  - entity: sensor.eos_connect_plan_data
+    name: Price
+    data_generator: |
+      return entity.attributes.time.map((t, i) => {
+        return [new Date(t).getTime(), entity.attributes.price_forecast[i] * 1000]; // Convert to EUR/MWh or similar if needed
+      });
+    type: line
+    color: blue
+    y_axis_id: price
+
+  - entity: sensor.eos_connect_plan_data
+    name: Planned Charge
+    data_generator: |
+      return entity.attributes.time.map((t, i) => {
+        return [new Date(t).getTime(), entity.attributes.plan_ac_charge[i] * 100]; // %
+      });
+    type: column
+    color: green
+    group_by:
+      func: avg
+      duration: 1h
+
+yaxis:
+  - id: default
+    decimals: 0
+  - id: price
+    opposite: true
+    decimals: 2
+```
 
 ## How it works
 

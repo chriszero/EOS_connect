@@ -19,6 +19,7 @@ CONF_ENTITY_PRICE = "entity_price"
 # EV Settings
 CONF_EV_ENABLED = "ev_enabled"
 CONF_ENTITY_EV_SOC = "entity_ev_soc"
+CONF_ENTITY_EV_CONNECTED = "entity_ev_connected"
 CONF_EV_CAPACITY = "ev_capacity_wh"
 CONF_EV_MAX_CHARGE_RATE = "ev_max_charge_rate_w"
 

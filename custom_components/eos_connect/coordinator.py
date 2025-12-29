@@ -24,6 +24,7 @@ from .const import (
     CONF_ENTITY_PRICE,
     CONF_EV_ENABLED,
     CONF_ENTITY_EV_SOC,
+    CONF_ENTITY_EV_CONNECTED,
     CONF_EV_CAPACITY,
     CONF_EV_MAX_CHARGE_RATE,
     CONF_LOAD_ENABLED,
@@ -55,6 +56,7 @@ class EosConnectCoordinator(DataUpdateCoordinator):
         # State storage
         self.last_run_time = None
         self.last_result = {}
+        self.last_input_data = {} # Stores PV, Load, Price arrays for visualization
         self.next_run_time = None
         self.optimization_status = "Idle"
 
@@ -82,6 +84,13 @@ class EosConnectCoordinator(DataUpdateCoordinator):
 
             # 6. Construct Payload
             payload = self._build_eos_payload(soc_val, load_profile, pv_forecast, prices, ev_data)
+
+            # Store inputs for visualization
+            self.last_input_data = {
+                "pv_forecast": pv_forecast,
+                "load_profile": load_profile,
+                "prices": prices
+            }
 
             # 5. Send to EOS
             self.optimization_status = "Optimizing"
@@ -331,6 +340,18 @@ class EosConnectCoordinator(DataUpdateCoordinator):
     def _get_ev_status(self):
         """Get EV status if enabled."""
         if not self.config_entry.data.get(CONF_EV_ENABLED):
+             return {"capacity_wh": 0}
+
+        # Check connection status (e.g. cable plugged in)
+        conn_entity = self.config_entry.data.get(CONF_ENTITY_EV_CONNECTED)
+        is_connected = True
+        if conn_entity:
+            state = self.hass.states.get(conn_entity)
+            if state and state.state == "off":
+                is_connected = False
+
+        if not is_connected:
+             # If not connected, tell EOS capacity is 0 so it doesn't plan charging
              return {"capacity_wh": 0}
 
         entity_id = self.config_entry.data.get(CONF_ENTITY_EV_SOC)

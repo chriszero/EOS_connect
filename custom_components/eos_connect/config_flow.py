@@ -26,6 +26,7 @@ from .const import (
     CONF_ENTITY_PRICE,
     CONF_EV_ENABLED,
     CONF_ENTITY_EV_SOC,
+    CONF_ENTITY_EV_CONNECTED,
     CONF_EV_CAPACITY,
     CONF_EV_MAX_CHARGE_RATE,
     CONF_LOAD_ENABLED,
@@ -118,6 +119,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_EV_ENABLED, default=False): bool,
                 vol.Optional(CONF_ENTITY_EV_SOC): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_ENTITY_EV_CONNECTED): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="binary_sensor")
                 ),
                 vol.Optional(CONF_EV_CAPACITY, default=50000): int,
                 vol.Optional(CONF_EV_MAX_CHARGE_RATE, default=11000): int,
