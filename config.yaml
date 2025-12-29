@@ -1,0 +1,125 @@
+# Load configuration
+load:
+  source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
+  url: http://homeassistant:8123 # URL for openhab or homeassistant
+  access_token: abc123  # access token for homeassistant (optional)
+  load_sensor: sensor.power_load # item / entity for load power data in watts
+  car_charge_load_sensor: sensor.wallbox_power # item / entity for wallbox power
+  additional_load_1_sensor: ""
+  additional_load_1_runtime: 0
+  additional_load_1_consumption: 0
+
+# EOS server configuration
+eos:
+  source: eos_server # Use the eos_server defined in docker-compose
+  server: eos_server # Hostname of the service in docker-compose
+  port: 8503
+  timeout: 180
+  time_frame: 3600
+
+# Electricity price configuration
+price:
+  source: default  # Change to tibber, etc. as needed
+  token: tibberBearerToken
+  fixed_price_adder_ct: 0.0
+  relative_price_multiplier: 0.0
+  fixed_24h_array: "10.1,10.1,10.1,10.1,10.1,23,28.23,28.23,28.23,28.23,28.23,23.52,23.52,23.52,23.52,28.17,28.17,34.28,34.28,34.28,34.28,34.28,28,23"
+  feed_in_price: 0.0
+  negative_price_switch: false
+
+# Battery configuration
+battery:
+  source: homeassistant
+  url: http://homeassistant:8123
+  access_token: YOUR_HA_TOKEN # !!! CHANGE ME !!!
+  soc_sensor: sensor.mt1_batterie_soc # Based on your ESPHome config (sensor.bat_soc)
+  capacity_wh: 5120 # Adjust to your battery capacity
+  charge_efficiency: 0.90
+  discharge_efficiency: 0.90
+  max_charge_power_w: 2500 # Adjust to your inverter max
+  min_soc_percentage: 10
+  max_soc_percentage: 100
+  charging_curve_enabled: true
+
+# PV Forecast configuration
+pv_forecast_source:
+  source: akkudoktor
+
+pv_forecast:
+  - name: MySolarSystem
+    lat: 52.52
+    lon: 13.40
+    azimuth: 0 # 0 = South in some APIs, check documentation (Akkudoktor: 0=S, -90=E, 90=W)
+    tilt: 30
+    power: 5000 # Wp
+    powerInverter: 5000 # W
+    inverterEfficiency: 0.95
+    horizon: "10,10,10,10"
+
+# Inverter Control Configuration (Marstek via Home Assistant)
+inverter:
+  type: homeassistant
+  url: http://homeassistant:8123 # !!! CHANGE ME !!!
+  token: YOUR_HA_TOKEN # !!! CHANGE ME !!!
+  max_grid_charge_rate: 2500
+  max_pv_charge_rate: 2500
+
+  # State: Force Charge (Grid)
+  # Uses 'Manual' mode and 'Force Charge' operation
+  charge_from_grid:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Manuell" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Zwangsladen" }
+    - service: number.set_value
+      entity_id: number.mt1_ziel_leistung_manuell
+      data_template: { "value": "{{ power }}" } # Dynamic power from EOS
+
+  # State: Avoid Discharge (Hold)
+  # Uses 'Anti-Feed-In' to allow PV charging, but sets Discharge Limit to 0 to stop draining
+  avoid_discharge:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Anti-Feed-In" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Stop" } # Stop any forced operations
+    - service: number.set_value
+      entity_id: number.mt1_max_entladeleistung_limit
+      data: { "value": 0 } # Block discharge to house
+    - service: number.set_value
+      entity_id: number.mt1_max_ladeleistung_limit
+      data: { "value": 2500 } # Allow full charging from PV
+
+  # State: Discharge Allowed (Normal)
+  # Uses 'Anti-Feed-In' (or 'AI-Modus' if preferred) and restores Discharge Limit
+  discharge_allowed:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Anti-Feed-In" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Stop" }
+    - service: number.set_value
+      entity_id: number.mt1_max_entladeleistung_limit
+      data: { "value": 2500 } # Restore discharge limit
+    - service: number.set_value
+      entity_id: number.mt1_max_ladeleistung_limit
+      data: { "value": 2500 }
+
+# MQTT configuration
+mqtt:
+  enabled: false
+  broker: homeassistant
+  port: 1883
+  user: mqtt_user
+  password: mqtt_password
+  ha_mqtt_auto_discovery: true
+  ha_mqtt_auto_discovery_prefix: homeassistant
+
+refresh_time: 3
+time_zone: Europe/Berlin
+eos_connect_web_port: 8081
+log_level: info
