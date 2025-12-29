@@ -7,7 +7,6 @@ from typing import Any
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
@@ -26,14 +25,14 @@ from .const import (
     CONF_EOS_SERVER,
     CONF_EOS_SOURCE,
     CONF_FEED_IN_PRICE,
+    CONF_FIXED_PRICE,
     CONF_LOAD_SENSOR,
     CONF_MAX_GRID_CHARGE_RATE,
     CONF_MAX_PV_CHARGE_RATE,
+    CONF_PRICE_ENTITY,
     CONF_PRICE_SOURCE,
-    CONF_PV_FORECAST_SOURCE,
-    CONF_PV_SYSTEMS,
+    CONF_PV_FORECAST_ENTITY,
     CONF_REFRESH_TIME,
-    CONF_TIBBER_TOKEN,
     CONF_TIME_FRAME,
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_EFFICIENCY,
@@ -47,12 +46,8 @@ from .const import (
     DOMAIN,
     EOS_SOURCE_EOS,
     EOS_SOURCE_EVOPT,
-    PRICE_SOURCE_AKKUDOKTOR,
     PRICE_SOURCE_FIXED,
-    PRICE_SOURCE_TIBBER,
-    PV_SOURCE_AKKUDOKTOR,
-    PV_SOURCE_FORECAST_SOLAR,
-    PV_SOURCE_OPENMETEO,
+    PRICE_SOURCE_HA_SENSOR,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -169,60 +164,46 @@ class EOSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_pv(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle PV configuration step."""
-        if user_input is not None:
-            # Parse PV systems
-            pv_systems = []
-            if user_input.get("pv_latitude") and user_input.get("pv_power_wp"):
-                pv_systems.append({
-                    "latitude": user_input.get("pv_latitude", 52.52),
-                    "longitude": user_input.get("pv_longitude", 13.405),
-                    "azimuth": user_input.get("pv_azimuth", 0),
-                    "tilt": user_input.get("pv_tilt", 30),
-                    "power_wp": user_input.get("pv_power_wp", 10000),
-                })
+        """Handle PV forecast configuration step.
 
-            self._data[CONF_PV_SYSTEMS] = pv_systems
-            self._data[CONF_PV_FORECAST_SOURCE] = user_input.get(CONF_PV_FORECAST_SOURCE, PV_SOURCE_AKKUDOKTOR)
+        Select a PV forecast sensor from existing integrations like:
+        - Solcast (ha-solcast-solar)
+        - Forecast.Solar
+        - Open-Meteo Solar
+        """
+        if user_input is not None:
+            self._data.update(user_input)
             return await self.async_step_price()
 
         return self.async_show_form(
             step_id="pv",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_PV_FORECAST_SOURCE, default=PV_SOURCE_AKKUDOKTOR): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                selector.SelectOptionDict(value=PV_SOURCE_AKKUDOKTOR, label="Akkudoktor"),
-                                selector.SelectOptionDict(value=PV_SOURCE_OPENMETEO, label="Open-Meteo"),
-                                selector.SelectOptionDict(value=PV_SOURCE_FORECAST_SOLAR, label="Forecast.Solar"),
-                            ],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
+                    vol.Optional(CONF_PV_FORECAST_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            multiple=False,
                         )
-                    ),
-                    vol.Optional("pv_latitude", default=52.52): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-90, max=90, step=0.0001)
-                    ),
-                    vol.Optional("pv_longitude", default=13.405): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-180, max=180, step=0.0001)
-                    ),
-                    vol.Optional("pv_power_wp", default=10000): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=100, max=100000, step=100, unit_of_measurement="Wp")
-                    ),
-                    vol.Optional("pv_azimuth", default=0): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-180, max=180, step=1, unit_of_measurement="°")
-                    ),
-                    vol.Optional("pv_tilt", default=30): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0, max=90, step=1, unit_of_measurement="°")
                     ),
                 }
             ),
+            description_placeholders={
+                "supported_integrations": "Solcast, Forecast.Solar, Open-Meteo Solar"
+            },
         )
 
     async def async_step_price(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle price configuration step."""
+        """Handle electricity price configuration step.
+
+        Select a price sensor from existing integrations like:
+        - Tibber
+        - ENTSO-E
+        - Nordpool
+        - Awattar
+        - EPEX Spot
+        """
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_load()
@@ -231,25 +212,32 @@ class EOSConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="price",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_PRICE_SOURCE, default=PRICE_SOURCE_AKKUDOKTOR): selector.SelectSelector(
+                    vol.Required(CONF_PRICE_SOURCE, default=PRICE_SOURCE_HA_SENSOR): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=[
-                                selector.SelectOptionDict(value=PRICE_SOURCE_AKKUDOKTOR, label="Akkudoktor"),
-                                selector.SelectOptionDict(value=PRICE_SOURCE_TIBBER, label="Tibber"),
+                                selector.SelectOptionDict(value=PRICE_SOURCE_HA_SENSOR, label="Home Assistant Sensor (Tibber, ENTSO-E, Nordpool, etc.)"),
                                 selector.SelectOptionDict(value=PRICE_SOURCE_FIXED, label="Fixed Price"),
                             ],
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
-                    vol.Optional(CONF_TIBBER_TOKEN): str,
+                    vol.Optional(CONF_PRICE_ENTITY): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            multiple=False,
+                        )
+                    ),
+                    vol.Optional(CONF_FIXED_PRICE, default=0.30): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=0, max=1.0, step=0.01, unit_of_measurement="€/kWh")
+                    ),
                     vol.Required(CONF_FEED_IN_PRICE, default=DEFAULT_FEED_IN_PRICE): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=0, max=0.5, step=0.001, unit_of_measurement="€/kWh")
                     ),
-                    vol.Optional("fixed_price", default=0.30): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0, max=1.0, step=0.01, unit_of_measurement="€/kWh")
-                    ),
                 }
             ),
+            description_placeholders={
+                "supported_integrations": "Tibber, ENTSO-E, Nordpool, Awattar, EPEX Spot"
+            },
         )
 
     async def async_step_load(
@@ -322,6 +310,12 @@ class EOSOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(CONF_REFRESH_TIME, default=current.get(CONF_REFRESH_TIME, DEFAULT_REFRESH_TIME)): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=60, step=1, unit_of_measurement="min")
+                    ),
+                    vol.Optional(CONF_PV_FORECAST_ENTITY, default=current.get(CONF_PV_FORECAST_ENTITY)): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
+                    ),
+                    vol.Optional(CONF_PRICE_ENTITY, default=current.get(CONF_PRICE_ENTITY)): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor")
                     ),
                     vol.Required(CONF_BATTERY_MIN_SOC, default=current.get(CONF_BATTERY_MIN_SOC, DEFAULT_BATTERY_MIN_SOC)): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=0, max=50, step=1, unit_of_measurement="%")

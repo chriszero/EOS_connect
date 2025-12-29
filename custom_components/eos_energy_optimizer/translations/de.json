@@ -27,25 +27,20 @@
         }
       },
       "pv": {
-        "title": "PV-Anlagen Konfiguration",
-        "description": "Konfigurieren Sie Ihre Photovoltaikanlage für die Prognose.",
+        "title": "PV-Prognose Konfiguration",
+        "description": "Wählen Sie einen PV-Prognose Sensor aus einer bestehenden Integration (Solcast, Forecast.Solar, Open-Meteo Solar).\n\nDer Sensor sollte Prognosedaten in seinen Attributen haben.",
         "data": {
-          "pv_forecast_source": "PV Prognose Quelle",
-          "pv_latitude": "Breitengrad",
-          "pv_longitude": "Längengrad",
-          "pv_power_wp": "PV Leistung (Wp)",
-          "pv_azimuth": "Azimut (°)",
-          "pv_tilt": "Neigung (°)"
+          "pv_forecast_entity": "PV-Prognose Sensor"
         }
       },
       "price": {
         "title": "Strompreis Konfiguration",
-        "description": "Konfigurieren Sie Ihre Strompreis-Quelle.",
+        "description": "Wählen Sie einen Strompreis-Sensor aus einer bestehenden Integration (Tibber, ENTSO-E, Nordpool, EPEX Spot, Awattar).\n\nDer Sensor sollte stündliche Preisdaten in seinen Attributen haben.",
         "data": {
           "price_source": "Preisquelle",
-          "tibber_token": "Tibber API Token",
-          "feed_in_price": "Einspeisevergütung (€/kWh)",
-          "fixed_price": "Festpreis (€/kWh)"
+          "price_entity": "Strompreis-Sensor",
+          "fixed_price": "Festpreis (€/kWh)",
+          "feed_in_price": "Einspeisevergütung (€/kWh)"
         }
       },
       "load": {
@@ -72,6 +67,8 @@
         "title": "EOS Energy Optimizer Optionen",
         "data": {
           "refresh_time": "Aktualisierungsintervall (Minuten)",
+          "pv_forecast_entity": "PV-Prognose Sensor",
+          "price_entity": "Strompreis-Sensor",
           "battery_min_soc": "Minimum SOC (%)",
           "battery_max_soc": "Maximum SOC (%)",
           "max_grid_charge_rate": "Max. Netzladerate (W)",

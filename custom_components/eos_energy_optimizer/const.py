@@ -46,18 +46,17 @@ DEFAULT_FEED_IN_PRICE: Final = 0.08
 EOS_SOURCE_EOS: Final = "eos_server"
 EOS_SOURCE_EVOPT: Final = "evopt"
 
-# Price sources
-PRICE_SOURCE_TIBBER: Final = "tibber"
-PRICE_SOURCE_AKKUDOKTOR: Final = "akkudoktor"
-PRICE_SOURCE_SMARTENERGY_AT: Final = "smartenergy_at"
-PRICE_SOURCE_STROMLIGNING: Final = "stromligning"
+# Price sources - use HA sensors from existing integrations
+PRICE_SOURCE_HA_SENSOR: Final = "ha_sensor"
 PRICE_SOURCE_FIXED: Final = "fixed_24h"
 
-# PV Forecast sources
-PV_SOURCE_AKKUDOKTOR: Final = "akkudoktor"
-PV_SOURCE_OPENMETEO: Final = "openmeteo"
-PV_SOURCE_FORECAST_SOLAR: Final = "forecast_solar"
-PV_SOURCE_SOLCAST: Final = "solcast"
+# PV Forecast sources - use HA sensors from existing integrations
+PV_SOURCE_HA_SENSOR: Final = "ha_sensor"
+
+# HA Sensor entity config keys
+CONF_PV_FORECAST_ENTITY: Final = "pv_forecast_entity"
+CONF_PRICE_ENTITY: Final = "price_entity"
+CONF_FIXED_PRICE: Final = "fixed_price"
 
 
 class InverterMode(IntEnum):

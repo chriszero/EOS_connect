@@ -25,14 +25,14 @@ from .const import (
     CONF_EOS_SERVER,
     CONF_EOS_SOURCE,
     CONF_FEED_IN_PRICE,
+    CONF_FIXED_PRICE,
     CONF_LOAD_SENSOR,
     CONF_MAX_GRID_CHARGE_RATE,
     CONF_MAX_PV_CHARGE_RATE,
+    CONF_PRICE_ENTITY,
     CONF_PRICE_SOURCE,
-    CONF_PV_FORECAST_SOURCE,
-    CONF_PV_SYSTEMS,
+    CONF_PV_FORECAST_ENTITY,
     CONF_REFRESH_TIME,
-    CONF_TIBBER_TOKEN,
     CONF_TIME_FRAME,
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_EFFICIENCY,
@@ -47,11 +47,8 @@ from .const import (
     DOMAIN,
     EOS_SOURCE_EVOPT,
     InverterMode,
-    PRICE_SOURCE_AKKUDOKTOR,
-    PRICE_SOURCE_TIBBER,
-    PV_SOURCE_AKKUDOKTOR,
-    PV_SOURCE_FORECAST_SOLAR,
-    PV_SOURCE_OPENMETEO,
+    PRICE_SOURCE_FIXED,
+    PRICE_SOURCE_HA_SENSOR,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -250,199 +247,298 @@ class EOSApiClient:
             self._data.load_profile = [400] * 48
 
     async def _update_pv_forecast(self) -> None:
-        """Update PV forecast."""
-        source = self.config.get(CONF_PV_FORECAST_SOURCE, PV_SOURCE_AKKUDOKTOR)
-        pv_systems = self.config.get(CONF_PV_SYSTEMS, [])
+        """Update PV forecast from Home Assistant sensor.
 
-        if not pv_systems:
+        Supports sensors from:
+        - Solcast (ha-solcast-solar): DetailedForecast, detailedHourly attributes
+        - Forecast.Solar: forecast attribute
+        - Open-Meteo Solar: forecast attribute
+        """
+        entity_id = self.config.get(CONF_PV_FORECAST_ENTITY)
+        if not entity_id:
             self._data.pv_forecast = [0] * 48
             return
 
-        try:
-            if source == PV_SOURCE_AKKUDOKTOR:
-                await self._fetch_akkudoktor_pv(pv_systems)
-            elif source == PV_SOURCE_OPENMETEO:
-                await self._fetch_openmeteo_pv(pv_systems)
-            elif source == PV_SOURCE_FORECAST_SOLAR:
-                await self._fetch_forecast_solar_pv(pv_systems)
-            else:
-                self._data.pv_forecast = [0] * 48
-        except Exception as e:
-            _LOGGER.error("Failed to fetch PV forecast: %s", e)
+        state = self.hass.states.get(entity_id)
+        if not state:
+            _LOGGER.warning("PV forecast entity %s not found", entity_id)
             self._data.pv_forecast = [0] * 48
+            return
 
-    async def _fetch_akkudoktor_pv(self, pv_systems: list[dict]) -> None:
-        """Fetch PV forecast from Akkudoktor."""
-        session = await self._get_session()
-        total_forecast = [0.0] * 48
+        forecast = [0.0] * 48
+        attrs = state.attributes
+        now = dt_util.now()
 
-        for system in pv_systems:
-            lat = system.get("latitude", 52.52)
-            lon = system.get("longitude", 13.405)
-            power = system.get("power_wp", 10000)
-            azimuth = system.get("azimuth", 0)
-            tilt = system.get("tilt", 30)
+        try:
+            # Try Solcast format (DetailedForecast or detailedHourly)
+            detailed = attrs.get("DetailedForecast") or attrs.get("detailedHourly") or attrs.get("detailed_forecast")
+            if detailed and isinstance(detailed, list):
+                forecast = self._parse_solcast_forecast(detailed, now)
+                _LOGGER.debug("Parsed Solcast forecast: %d periods", len([f for f in forecast if f > 0]))
 
-            url = (
-                f"https://api.akkudoktor.net/forecast?"
-                f"lat={lat}&lon={lon}&power={power}&azimuth={azimuth}&tilt={tilt}"
-            )
+            # Try Forecast.Solar / generic forecast format
+            elif "forecast" in attrs:
+                forecast_data = attrs.get("forecast", [])
+                if isinstance(forecast_data, list):
+                    forecast = self._parse_generic_forecast(forecast_data, now)
+                    _LOGGER.debug("Parsed generic forecast: %d periods", len([f for f in forecast if f > 0]))
 
+            # Try watt_hours / watts attributes (Forecast.Solar native)
+            elif "watt_hours" in attrs or "watts" in attrs:
+                wh_data = attrs.get("watt_hours") or attrs.get("watts", {})
+                if isinstance(wh_data, dict):
+                    forecast = self._parse_watt_hours_forecast(wh_data, now)
+                    _LOGGER.debug("Parsed watt_hours forecast: %d periods", len([f for f in forecast if f > 0]))
+
+            # Fallback: try to use state value as current hour production
+            else:
+                try:
+                    current_power = float(state.state)
+                    forecast[0] = current_power
+                    _LOGGER.debug("Using current state as PV forecast: %s W", current_power)
+                except (ValueError, TypeError):
+                    pass
+
+        except Exception as e:
+            _LOGGER.error("Failed to parse PV forecast: %s", e)
+
+        self._data.pv_forecast = forecast
+
+    def _parse_solcast_forecast(self, detailed: list, now: datetime) -> list[float]:
+        """Parse Solcast DetailedForecast format."""
+        forecast = [0.0] * 48
+
+        for period in detailed:
             try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if "hourly" in data:
-                            for i, val in enumerate(data["hourly"][:48]):
-                                total_forecast[i] += float(val.get("power", 0))
+                # Get period start time
+                period_start_str = period.get("period_start")
+                if not period_start_str:
+                    continue
+
+                period_start = datetime.fromisoformat(period_start_str.replace("Z", "+00:00"))
+
+                # Calculate hours from now
+                hours_diff = (period_start - now).total_seconds() / 3600
+
+                # Only use future periods within 48 hours
+                if 0 <= hours_diff < 48:
+                    hour_idx = int(hours_diff)
+                    # Use pv_estimate (50th percentile) or pv_estimate90 for optimistic
+                    power = period.get("pv_estimate", 0) or period.get("pv_estimate50", 0)
+                    if power:
+                        forecast[hour_idx] += float(power)
             except Exception as e:
-                _LOGGER.warning("Failed to fetch Akkudoktor PV: %s", e)
+                _LOGGER.debug("Error parsing Solcast period: %s", e)
 
-        self._data.pv_forecast = total_forecast
+        return forecast
 
-    async def _fetch_openmeteo_pv(self, pv_systems: list[dict]) -> None:
-        """Fetch PV forecast from Open-Meteo."""
-        session = await self._get_session()
-        total_forecast = [0.0] * 48
+    def _parse_generic_forecast(self, forecast_data: list, now: datetime) -> list[float]:
+        """Parse generic forecast format with period_start and value."""
+        forecast = [0.0] * 48
 
-        for system in pv_systems:
-            lat = system.get("latitude", 52.52)
-            lon = system.get("longitude", 13.405)
-            power = system.get("power_wp", 10000)
-
-            url = (
-                f"https://api.open-meteo.com/v1/forecast?"
-                f"latitude={lat}&longitude={lon}&hourly=direct_radiation,diffuse_radiation"
-            )
-
+        for period in forecast_data:
             try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if "hourly" in data:
-                            hourly = data["hourly"]
-                            for i in range(min(48, len(hourly.get("direct_radiation", [])))):
-                                direct = hourly.get("direct_radiation", [0])[i] or 0
-                                diffuse = hourly.get("diffuse_radiation", [0])[i] or 0
-                                irradiance = direct + diffuse
-                                pv_power = (irradiance * power) / 1000
-                                total_forecast[i] += pv_power
+                # Try different timestamp keys
+                period_start_str = (
+                    period.get("period_start") or
+                    period.get("datetime") or
+                    period.get("start") or
+                    period.get("time")
+                )
+                if not period_start_str:
+                    continue
+
+                period_start = datetime.fromisoformat(str(period_start_str).replace("Z", "+00:00"))
+
+                hours_diff = (period_start - now).total_seconds() / 3600
+
+                if 0 <= hours_diff < 48:
+                    hour_idx = int(hours_diff)
+                    # Try different value keys
+                    power = (
+                        period.get("pv_estimate") or
+                        period.get("power") or
+                        period.get("watt_hours") or
+                        period.get("value") or 0
+                    )
+                    forecast[hour_idx] += float(power)
             except Exception as e:
-                _LOGGER.warning("Failed to fetch Open-Meteo PV: %s", e)
+                _LOGGER.debug("Error parsing forecast period: %s", e)
 
-        self._data.pv_forecast = total_forecast
+        return forecast
 
-    async def _fetch_forecast_solar_pv(self, pv_systems: list[dict]) -> None:
-        """Fetch PV forecast from Forecast.Solar."""
-        session = await self._get_session()
-        total_forecast = [0.0] * 48
+    def _parse_watt_hours_forecast(self, wh_data: dict, now: datetime) -> list[float]:
+        """Parse watt_hours dict format (timestamp -> value)."""
+        forecast = [0.0] * 48
 
-        for system in pv_systems:
-            lat = system.get("latitude", 52.52)
-            lon = system.get("longitude", 13.405)
-            power = system.get("power_wp", 10000)
-            azimuth = system.get("azimuth", 0)
-            tilt = system.get("tilt", 30)
-            power_kwp = power / 1000
-
-            url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{tilt}/{azimuth}/{power_kwp}"
-
+        for timestamp_str, value in wh_data.items():
             try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        if "result" in data and "watt_hours_period" in data["result"]:
-                            wh = data["result"]["watt_hours_period"]
-                            now_hour = dt_util.now().hour
-                            for i, (ts, val) in enumerate(wh.items()):
-                                if i < 48:
-                                    total_forecast[i] += float(val)
-            except Exception as e:
-                _LOGGER.warning("Failed to fetch Forecast.Solar PV: %s", e)
+                timestamp = datetime.fromisoformat(str(timestamp_str).replace("Z", "+00:00"))
+                hours_diff = (timestamp - now).total_seconds() / 3600
 
-        self._data.pv_forecast = total_forecast
+                if 0 <= hours_diff < 48:
+                    hour_idx = int(hours_diff)
+                    forecast[hour_idx] += float(value)
+            except Exception as e:
+                _LOGGER.debug("Error parsing watt_hours entry: %s", e)
+
+        return forecast
 
     async def _update_prices(self) -> None:
-        """Update electricity prices."""
-        source = self.config.get(CONF_PRICE_SOURCE, PRICE_SOURCE_AKKUDOKTOR)
+        """Update electricity prices from Home Assistant sensor.
 
-        try:
-            if source == PRICE_SOURCE_TIBBER:
-                await self._fetch_tibber_prices()
-            elif source == PRICE_SOURCE_AKKUDOKTOR:
-                await self._fetch_akkudoktor_prices()
-            else:
-                fixed_price = self.config.get("fixed_price", 0.30)
-                self._data.prices = [fixed_price] * 48
-        except Exception as e:
-            _LOGGER.error("Failed to fetch prices: %s", e)
-            self._data.prices = [0.30] * 48
+        Supports sensors from:
+        - Tibber: prices attribute with from/till/price
+        - ENTSO-E: prices attribute with time/price
+        - Nordpool: prices_today/prices_tomorrow or raw_today/raw_tomorrow
+        - Generic: prices attribute as list of dicts or plain list
+        """
+        source = self.config.get(CONF_PRICE_SOURCE, PRICE_SOURCE_HA_SENSOR)
 
-    async def _fetch_tibber_prices(self) -> None:
-        """Fetch prices from Tibber."""
-        token = self.config.get(CONF_TIBBER_TOKEN)
-        if not token:
+        if source == PRICE_SOURCE_FIXED:
+            fixed_price = self.config.get(CONF_FIXED_PRICE, 0.30)
+            self._data.prices = [fixed_price] * 48
+            return
+
+        entity_id = self.config.get(CONF_PRICE_ENTITY)
+        if not entity_id:
+            _LOGGER.warning("No price entity configured")
             self._data.prices = [0.30] * 48
             return
 
-        session = await self._get_session()
-        url = "https://api.tibber.com/v1-beta/gql"
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        query = {
-            "query": """{
-                viewer {
-                    homes {
-                        currentSubscription {
-                            priceInfo {
-                                today { total }
-                                tomorrow { total }
-                            }
-                        }
-                    }
-                }
-            }"""
-        }
+        state = self.hass.states.get(entity_id)
+        if not state:
+            _LOGGER.warning("Price entity %s not found", entity_id)
+            self._data.prices = [0.30] * 48
+            return
+
+        prices = [0.30] * 48
+        attrs = state.attributes
+        now = dt_util.now()
 
         try:
-            async with session.post(url, json=query, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    prices = []
-                    homes = data.get("data", {}).get("viewer", {}).get("homes", [])
-                    if homes:
-                        price_info = homes[0].get("currentSubscription", {}).get("priceInfo", {})
-                        for entry in price_info.get("today", []) + price_info.get("tomorrow", []):
-                            prices.append(float(entry.get("total", 0.30)))
-                        while len(prices) < 48:
-                            prices.append(prices[-1] if prices else 0.30)
-                        self._data.prices = prices[:48]
-                else:
-                    self._data.prices = [0.30] * 48
-        except Exception as e:
-            _LOGGER.warning("Failed to fetch Tibber prices: %s", e)
-            self._data.prices = [0.30] * 48
+            # Try Tibber format: prices list with from/till/price
+            if "prices" in attrs:
+                prices_data = attrs.get("prices", [])
+                if isinstance(prices_data, list) and prices_data:
+                    prices = self._parse_tibber_prices(prices_data, now)
+                    _LOGGER.debug("Parsed Tibber-style prices: %d hours", len([p for p in prices if p != 0.30]))
 
-    async def _fetch_akkudoktor_prices(self) -> None:
-        """Fetch prices from Akkudoktor."""
-        session = await self._get_session()
-        url = "https://api.akkudoktor.net/prices"
+            # Try Nordpool format: prices_today / prices_tomorrow
+            elif "prices_today" in attrs or "raw_today" in attrs:
+                today = attrs.get("prices_today") or attrs.get("raw_today", [])
+                tomorrow = attrs.get("prices_tomorrow") or attrs.get("raw_tomorrow", [])
+                prices = self._parse_nordpool_prices(today, tomorrow, now)
+                _LOGGER.debug("Parsed Nordpool-style prices: %d hours", len([p for p in prices if p != 0.30]))
 
-        try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    prices = []
-                    if "hourly" in data:
-                        for entry in data["hourly"][:48]:
-                            prices.append(float(entry.get("price", 0.30)))
-                    while len(prices) < 48:
-                        prices.append(prices[-1] if prices else 0.30)
-                    self._data.prices = prices[:48]
-                else:
-                    self._data.prices = [0.30] * 48
+            # Try ENTSO-E format: list with time/price dicts
+            elif "data" in attrs:
+                data = attrs.get("data", [])
+                if isinstance(data, list):
+                    prices = self._parse_entsoe_prices(data, now)
+                    _LOGGER.debug("Parsed ENTSO-E style prices: %d hours", len([p for p in prices if p != 0.30]))
+
+            # Fallback: try to use current state as price
+            else:
+                try:
+                    current_price = float(state.state)
+                    prices = [current_price] * 48
+                    _LOGGER.debug("Using current state as price: %s €/kWh", current_price)
+                except (ValueError, TypeError):
+                    pass
+
         except Exception as e:
-            _LOGGER.warning("Failed to fetch Akkudoktor prices: %s", e)
-            self._data.prices = [0.30] * 48
+            _LOGGER.error("Failed to parse prices: %s", e)
+
+        self._data.prices = prices
+
+    def _parse_tibber_prices(self, prices_data: list, now: datetime) -> list[float]:
+        """Parse Tibber prices format: [{from, till, price}, ...]"""
+        prices = [0.30] * 48
+
+        for entry in prices_data:
+            try:
+                # Tibber format: from/till timestamps with price
+                from_str = entry.get("from") or entry.get("startsAt")
+                price = entry.get("price") or entry.get("total")
+
+                if not from_str or price is None:
+                    continue
+
+                from_time = datetime.fromisoformat(str(from_str).replace("Z", "+00:00"))
+                hours_diff = (from_time - now).total_seconds() / 3600
+
+                if -1 <= hours_diff < 48:  # Include current hour
+                    hour_idx = max(0, int(hours_diff))
+                    if hour_idx < 48:
+                        prices[hour_idx] = float(price)
+            except Exception as e:
+                _LOGGER.debug("Error parsing Tibber price entry: %s", e)
+
+        return prices
+
+    def _parse_nordpool_prices(self, today: list, tomorrow: list, now: datetime) -> list[float]:
+        """Parse Nordpool prices format: list of hourly prices."""
+        prices = [0.30] * 48
+        current_hour = now.hour
+
+        # Process today's prices
+        if isinstance(today, list):
+            for i, price in enumerate(today):
+                try:
+                    hour_idx = i - current_hour
+                    if 0 <= hour_idx < 48:
+                        # Handle both raw values and dicts
+                        if isinstance(price, dict):
+                            prices[hour_idx] = float(price.get("value", price.get("price", 0.30)))
+                        else:
+                            prices[hour_idx] = float(price) if price is not None else 0.30
+                except (ValueError, TypeError):
+                    pass
+
+        # Process tomorrow's prices
+        if isinstance(tomorrow, list):
+            hours_until_midnight = 24 - current_hour
+            for i, price in enumerate(tomorrow):
+                try:
+                    hour_idx = hours_until_midnight + i
+                    if 0 <= hour_idx < 48:
+                        if isinstance(price, dict):
+                            prices[hour_idx] = float(price.get("value", price.get("price", 0.30)))
+                        else:
+                            prices[hour_idx] = float(price) if price is not None else 0.30
+                except (ValueError, TypeError):
+                    pass
+
+        return prices
+
+    def _parse_entsoe_prices(self, data: list, now: datetime) -> list[float]:
+        """Parse ENTSO-E prices format: [{time, price}, ...]"""
+        prices = [0.30] * 48
+
+        for entry in data:
+            try:
+                time_str = entry.get("time") or entry.get("start") or entry.get("datetime")
+                price = entry.get("price") or entry.get("value")
+
+                if not time_str or price is None:
+                    continue
+
+                entry_time = datetime.fromisoformat(str(time_str).replace("Z", "+00:00"))
+                hours_diff = (entry_time - now).total_seconds() / 3600
+
+                if -1 <= hours_diff < 48:
+                    hour_idx = max(0, int(hours_diff))
+                    if hour_idx < 48:
+                        # ENTSO-E often uses €/MWh, convert to €/kWh
+                        price_value = float(price)
+                        if price_value > 1:  # Likely €/MWh
+                            price_value = price_value / 1000
+                        prices[hour_idx] = price_value
+            except Exception as e:
+                _LOGGER.debug("Error parsing ENTSO-E price entry: %s", e)
+
+        return prices
 
     def _update_battery_state(self) -> None:
         """Update calculated battery state values."""
