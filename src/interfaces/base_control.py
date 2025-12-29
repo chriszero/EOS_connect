@@ -314,7 +314,10 @@ class BaseControl:
         # tgt_ac_charge_demand is the total energy (in Wh) needed in the current time frame.
         # seconds_to_end_of_current_time_frame is the remaining seconds in the time frame.
         # The needed power (in W) is calculated as energy divided by time (in hours).
-        if seconds_to_end_of_current_time_frame > 0:
+        if self.override_active and self.current_overall_state == MODE_CHARGE_FROM_GRID:
+            # If override is active, use the override charge rate directly
+            needed_ac_charge_power = self.override_charge_rate * 1000
+        elif seconds_to_end_of_current_time_frame > 0:
             needed_ac_charge_power = round(
                 self.current_ac_charge_demand
                 / (seconds_to_end_of_current_time_frame / 3600),

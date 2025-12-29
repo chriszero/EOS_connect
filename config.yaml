@@ -71,6 +71,9 @@ inverter:
       entity_id: select.mt1_betriebsmodus
       data: { "option": "Manuell" }
     - service: select.select_option
+      entity_id: select.mt1_rs485_control_mode
+      data: { "option": "Aktiviert" } # Must be activated for forced charging
+    - service: select.select_option
       entity_id: select.mt1_erzwungene_operation
       data: { "option": "Zwangsladen" }
     - service: number.set_value
