@@ -7,7 +7,17 @@ services:
     ports:
       - "8081:8081"
     volumes:
-      - ./src/config.yaml:/app/config.yaml
+      - ./src/config.yaml:/app/src/config.yaml
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    depends_on:
+      - eos_server
+
+  eos_server:
+    image: ghcr.io/akkudoktor/eos:latest
+    ports:
+      - "8503:8503"
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
