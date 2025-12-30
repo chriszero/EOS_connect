@@ -33,6 +33,11 @@ CONF_CHARGING_CURVE_ENABLED: Final = "charging_curve_enabled"
 CONF_EVCC_ENABLED: Final = "evcc_enabled"
 CONF_EVCC_URL: Final = "evcc_url"
 
+# 15-minute refinement configuration
+CONF_15MIN_REFINEMENT_ENABLED: Final = "15min_refinement_enabled"
+DEFAULT_15MIN_REFINEMENT_ENABLED: Final = False
+UPDATE_INTERVAL_15MIN: Final = 900  # 15 minutes in seconds
+
 # Default values
 DEFAULT_EOS_PORT: Final = 8503
 DEFAULT_TIME_FRAME: Final = 3600
@@ -100,4 +105,4 @@ SERVICE_SET_SOC_LIMITS: Final = "set_soc_limits"
 SERVICE_SET_EVCC_BATTERY_MODE: Final = "set_evcc_battery_mode"
 
 # Platforms
-PLATFORMS: Final = ["sensor", "binary_sensor", "select", "number", "button"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "select", "number", "button", "switch"]

@@ -144,7 +144,8 @@ class EOSData:
     evcc: EVCCState = field(default_factory=EVCCState)
     optimization: OptimizationResult = field(default_factory=OptimizationResult)
     pv_forecast: list[float] = field(default_factory=list)
-    prices: list[float] = field(default_factory=list)
+    prices: list[float] = field(default_factory=list)  # Hourly prices for EOS
+    prices_15min: list[float] = field(default_factory=list)  # 15-min prices for refinement
     load_profile: list[float] = field(default_factory=list)
     last_update: datetime | None = None
     last_optimization: datetime | None = None
@@ -497,27 +498,34 @@ class EOSApiClient:
         - ENTSO-E: prices attribute with time/price
         - Nordpool: prices_today/prices_tomorrow or raw_today/raw_tomorrow
         - Generic: prices attribute as list of dicts or plain list
+
+        Stores both hourly prices (for EOS) and 15-min prices (for refinement).
         """
         source = self.config.get(CONF_PRICE_SOURCE, PRICE_SOURCE_HA_SENSOR)
 
         if source == PRICE_SOURCE_FIXED:
             fixed_price = self.config.get(CONF_FIXED_PRICE, 0.30)
             self._data.prices = [fixed_price] * 48
+            # Expand to 192 15-min slots
+            self._data.prices_15min = [fixed_price] * 192
             return
 
         entity_id = self.config.get(CONF_PRICE_ENTITY)
         if not entity_id:
             _LOGGER.warning("No price entity configured")
             self._data.prices = [0.30] * 48
+            self._data.prices_15min = [0.30] * 192
             return
 
         state = self.hass.states.get(entity_id)
         if not state:
             _LOGGER.warning("Price entity %s not found", entity_id)
             self._data.prices = [0.30] * 48
+            self._data.prices_15min = [0.30] * 192
             return
 
         prices = [0.30] * 48
+        prices_15min = [0.30] * 192  # 48 hours * 4 slots
         attrs = state.attributes
         now = dt_util.now()
 
@@ -526,7 +534,7 @@ class EOSApiClient:
             if "prices" in attrs:
                 prices_data = attrs.get("prices", [])
                 if isinstance(prices_data, list) and prices_data:
-                    prices = self._parse_tibber_prices(prices_data, now)
+                    prices, prices_15min = self._parse_tibber_prices_dual(prices_data, now)
                     _LOGGER.debug("Parsed Tibber-style prices: %d hours", len([p for p in prices if p != 0.30]))
 
             # Try Nordpool format: prices_today / prices_tomorrow
@@ -534,13 +542,15 @@ class EOSApiClient:
                 today = attrs.get("prices_today") or attrs.get("raw_today", [])
                 tomorrow = attrs.get("prices_tomorrow") or attrs.get("raw_tomorrow", [])
                 prices = self._parse_nordpool_prices(today, tomorrow, now)
+                # Nordpool is hourly, expand to 15-min
+                prices_15min = self._expand_hourly_to_15min(prices)
                 _LOGGER.debug("Parsed Nordpool-style prices: %d hours", len([p for p in prices if p != 0.30]))
 
             # Try ENTSO-E format: list with time/price dicts
             elif "data" in attrs:
                 data = attrs.get("data", [])
                 if isinstance(data, list):
-                    prices = self._parse_entsoe_prices(data, now)
+                    prices, prices_15min = self._parse_entsoe_prices_dual(data, now)
                     _LOGGER.debug("Parsed ENTSO-E style prices: %d hours", len([p for p in prices if p != 0.30]))
 
             # Fallback: try to use current state as price
@@ -548,6 +558,7 @@ class EOSApiClient:
                 try:
                     current_price = float(state.state)
                     prices = [current_price] * 48
+                    prices_15min = [current_price] * 192
                     _LOGGER.debug("Using current state as price: %s €/kWh", current_price)
                 except (ValueError, TypeError):
                     pass
@@ -556,40 +567,43 @@ class EOSApiClient:
             _LOGGER.error("Failed to parse prices: %s", e)
 
         self._data.prices = prices
+        self._data.prices_15min = prices_15min
 
-    def _aggregate_subhourly_to_hourly(
-        self, subhourly_prices: dict[int, list[float]], default_price: float = 0.30
-    ) -> list[float]:
-        """Aggregate sub-hourly prices (e.g., 15-min) to hourly averages.
+    def _expand_hourly_to_15min(self, hourly_prices: list[float]) -> list[float]:
+        """Expand hourly prices to 15-minute slots (4 per hour).
 
         Args:
-            subhourly_prices: Dict mapping hour_idx to list of prices within that hour
-            default_price: Default price if no data available
+            hourly_prices: List of 48 hourly prices
 
         Returns:
-            List of 48 hourly average prices
+            List of 192 15-minute prices
         """
-        prices = [default_price] * 48
+        prices_15min = []
+        for price in hourly_prices[:48]:
+            prices_15min.extend([price] * 4)
+        # Pad to 192 if needed
+        while len(prices_15min) < 192:
+            prices_15min.append(0.30)
+        return prices_15min[:192]
 
-        for hour_idx, price_list in subhourly_prices.items():
-            if 0 <= hour_idx < 48 and price_list:
-                # Use average of all sub-hourly prices
-                prices[hour_idx] = sum(price_list) / len(price_list)
-
-        return prices
-
-    def _parse_tibber_prices(self, prices_data: list, now: datetime) -> list[float]:
+    def _parse_tibber_prices_dual(
+        self, prices_data: list, now: datetime
+    ) -> tuple[list[float], list[float]]:
         """Parse Tibber prices format: [{from, till, price}, ...]
 
         Supports both hourly and 15-minute (quarter-hourly) resolution.
-        Multiple values per hour are averaged.
+        Returns both hourly (for EOS) and 15-min prices (for refinement).
+
+        Returns:
+            Tuple of (hourly_prices, prices_15min)
         """
         # Collect all prices per hour for aggregation
         hourly_prices: dict[int, list[float]] = {}
+        # Collect 15-min prices by slot index (0-191)
+        prices_15min_dict: dict[int, float] = {}
 
         for entry in prices_data:
             try:
-                # Tibber format: from/till timestamps with price
                 from_str = entry.get("from") or entry.get("startsAt")
                 price = entry.get("price") or entry.get("total")
 
@@ -597,9 +611,19 @@ class EOSApiClient:
                     continue
 
                 from_time = datetime.fromisoformat(str(from_str).replace("Z", "+00:00"))
-                hours_diff = (from_time - now).total_seconds() / 3600
+                total_minutes_diff = (from_time - now).total_seconds() / 60
 
-                if -1 <= hours_diff < 48:  # Include current hour
+                # Calculate 15-min slot index
+                slot_15min = int(total_minutes_diff / 15)
+
+                if -4 <= slot_15min < 192:  # Include current slots
+                    slot_idx = max(0, slot_15min)
+                    if slot_idx < 192:
+                        prices_15min_dict[slot_idx] = float(price)
+
+                # Also calculate hourly index for aggregation
+                hours_diff = total_minutes_diff / 60
+                if -1 <= hours_diff < 48:
                     hour_idx = max(0, int(hours_diff))
                     if hour_idx < 48:
                         if hour_idx not in hourly_prices:
@@ -608,15 +632,28 @@ class EOSApiClient:
             except Exception as e:
                 _LOGGER.debug("Error parsing Tibber price entry: %s", e)
 
-        # Check if we have sub-hourly data (more than 48 entries for 48 hours)
-        total_entries = sum(len(v) for v in hourly_prices.values())
-        if total_entries > 48:
+        # Build hourly prices (averaged)
+        prices_hourly = [0.30] * 48
+        for hour_idx, price_list in hourly_prices.items():
+            if 0 <= hour_idx < 48 and price_list:
+                prices_hourly[hour_idx] = sum(price_list) / len(price_list)
+
+        # Build 15-min prices
+        prices_15min = [0.30] * 192
+        for slot_idx, price in prices_15min_dict.items():
+            if 0 <= slot_idx < 192:
+                prices_15min[slot_idx] = price
+
+        # If no 15-min data, expand hourly to 15-min
+        if not prices_15min_dict:
+            prices_15min = self._expand_hourly_to_15min(prices_hourly)
+        else:
             _LOGGER.debug(
-                "Detected sub-hourly prices (%d entries), aggregating to hourly averages",
-                total_entries,
+                "Parsed %d 15-minute price slots for refinement",
+                len(prices_15min_dict),
             )
 
-        return self._aggregate_subhourly_to_hourly(hourly_prices)
+        return prices_hourly, prices_15min
 
     def _parse_nordpool_prices(self, today: list, tomorrow: list, now: datetime) -> list[float]:
         """Parse Nordpool prices format: list of hourly prices."""
@@ -653,14 +690,19 @@ class EOSApiClient:
 
         return prices
 
-    def _parse_entsoe_prices(self, data: list, now: datetime) -> list[float]:
+    def _parse_entsoe_prices_dual(
+        self, data: list, now: datetime
+    ) -> tuple[list[float], list[float]]:
         """Parse ENTSO-E prices format: [{time, price}, ...]
 
         Supports both hourly and 15-minute resolution (EPEX Spot DE-LU).
-        Multiple values per hour are averaged.
+        Returns both hourly (for EOS) and 15-min prices (for refinement).
+
+        Returns:
+            Tuple of (hourly_prices, prices_15min)
         """
-        # Collect all prices per hour for aggregation
         hourly_prices: dict[int, list[float]] = {}
+        prices_15min_dict: dict[int, float] = {}
 
         for entry in data:
             try:
@@ -671,31 +713,53 @@ class EOSApiClient:
                     continue
 
                 entry_time = datetime.fromisoformat(str(time_str).replace("Z", "+00:00"))
-                hours_diff = (entry_time - now).total_seconds() / 3600
+                total_minutes_diff = (entry_time - now).total_seconds() / 60
 
+                # ENTSO-E often uses €/MWh, convert to €/kWh
+                price_value = float(price)
+                if price_value > 1:  # Likely €/MWh
+                    price_value = price_value / 1000
+
+                # Calculate 15-min slot index
+                slot_15min = int(total_minutes_diff / 15)
+                if -4 <= slot_15min < 192:
+                    slot_idx = max(0, slot_15min)
+                    if slot_idx < 192:
+                        prices_15min_dict[slot_idx] = price_value
+
+                # Calculate hourly index for aggregation
+                hours_diff = total_minutes_diff / 60
                 if -1 <= hours_diff < 48:
                     hour_idx = max(0, int(hours_diff))
                     if hour_idx < 48:
-                        # ENTSO-E often uses €/MWh, convert to €/kWh
-                        price_value = float(price)
-                        if price_value > 1:  # Likely €/MWh
-                            price_value = price_value / 1000
-
                         if hour_idx not in hourly_prices:
                             hourly_prices[hour_idx] = []
                         hourly_prices[hour_idx].append(price_value)
             except Exception as e:
                 _LOGGER.debug("Error parsing ENTSO-E price entry: %s", e)
 
-        # Check if we have sub-hourly data
-        total_entries = sum(len(v) for v in hourly_prices.values())
-        if total_entries > 48:
+        # Build hourly prices (averaged)
+        prices_hourly = [0.30] * 48
+        for hour_idx, price_list in hourly_prices.items():
+            if 0 <= hour_idx < 48 and price_list:
+                prices_hourly[hour_idx] = sum(price_list) / len(price_list)
+
+        # Build 15-min prices
+        prices_15min = [0.30] * 192
+        for slot_idx, price in prices_15min_dict.items():
+            if 0 <= slot_idx < 192:
+                prices_15min[slot_idx] = price
+
+        # If no 15-min data, expand hourly to 15-min
+        if not prices_15min_dict:
+            prices_15min = self._expand_hourly_to_15min(prices_hourly)
+        else:
             _LOGGER.debug(
-                "Detected sub-hourly ENTSO-E prices (%d entries), aggregating to hourly averages",
-                total_entries,
+                "Parsed %d 15-minute ENTSO-E price slots for refinement",
+                len(prices_15min_dict),
             )
 
-        return self._aggregate_subhourly_to_hourly(hourly_prices)
+        return prices_hourly, prices_15min
 
     def _update_battery_state(self) -> None:
         """Update calculated battery state values."""
