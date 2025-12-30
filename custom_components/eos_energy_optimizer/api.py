@@ -557,9 +557,35 @@ class EOSApiClient:
 
         self._data.prices = prices
 
+    def _aggregate_subhourly_to_hourly(
+        self, subhourly_prices: dict[int, list[float]], default_price: float = 0.30
+    ) -> list[float]:
+        """Aggregate sub-hourly prices (e.g., 15-min) to hourly averages.
+
+        Args:
+            subhourly_prices: Dict mapping hour_idx to list of prices within that hour
+            default_price: Default price if no data available
+
+        Returns:
+            List of 48 hourly average prices
+        """
+        prices = [default_price] * 48
+
+        for hour_idx, price_list in subhourly_prices.items():
+            if 0 <= hour_idx < 48 and price_list:
+                # Use average of all sub-hourly prices
+                prices[hour_idx] = sum(price_list) / len(price_list)
+
+        return prices
+
     def _parse_tibber_prices(self, prices_data: list, now: datetime) -> list[float]:
-        """Parse Tibber prices format: [{from, till, price}, ...]"""
-        prices = [0.30] * 48
+        """Parse Tibber prices format: [{from, till, price}, ...]
+
+        Supports both hourly and 15-minute (quarter-hourly) resolution.
+        Multiple values per hour are averaged.
+        """
+        # Collect all prices per hour for aggregation
+        hourly_prices: dict[int, list[float]] = {}
 
         for entry in prices_data:
             try:
@@ -576,11 +602,21 @@ class EOSApiClient:
                 if -1 <= hours_diff < 48:  # Include current hour
                     hour_idx = max(0, int(hours_diff))
                     if hour_idx < 48:
-                        prices[hour_idx] = float(price)
+                        if hour_idx not in hourly_prices:
+                            hourly_prices[hour_idx] = []
+                        hourly_prices[hour_idx].append(float(price))
             except Exception as e:
                 _LOGGER.debug("Error parsing Tibber price entry: %s", e)
 
-        return prices
+        # Check if we have sub-hourly data (more than 48 entries for 48 hours)
+        total_entries = sum(len(v) for v in hourly_prices.values())
+        if total_entries > 48:
+            _LOGGER.debug(
+                "Detected sub-hourly prices (%d entries), aggregating to hourly averages",
+                total_entries,
+            )
+
+        return self._aggregate_subhourly_to_hourly(hourly_prices)
 
     def _parse_nordpool_prices(self, today: list, tomorrow: list, now: datetime) -> list[float]:
         """Parse Nordpool prices format: list of hourly prices."""
@@ -618,8 +654,13 @@ class EOSApiClient:
         return prices
 
     def _parse_entsoe_prices(self, data: list, now: datetime) -> list[float]:
-        """Parse ENTSO-E prices format: [{time, price}, ...]"""
-        prices = [0.30] * 48
+        """Parse ENTSO-E prices format: [{time, price}, ...]
+
+        Supports both hourly and 15-minute resolution (EPEX Spot DE-LU).
+        Multiple values per hour are averaged.
+        """
+        # Collect all prices per hour for aggregation
+        hourly_prices: dict[int, list[float]] = {}
 
         for entry in data:
             try:
@@ -639,11 +680,22 @@ class EOSApiClient:
                         price_value = float(price)
                         if price_value > 1:  # Likely €/MWh
                             price_value = price_value / 1000
-                        prices[hour_idx] = price_value
+
+                        if hour_idx not in hourly_prices:
+                            hourly_prices[hour_idx] = []
+                        hourly_prices[hour_idx].append(price_value)
             except Exception as e:
                 _LOGGER.debug("Error parsing ENTSO-E price entry: %s", e)
 
-        return prices
+        # Check if we have sub-hourly data
+        total_entries = sum(len(v) for v in hourly_prices.values())
+        if total_entries > 48:
+            _LOGGER.debug(
+                "Detected sub-hourly ENTSO-E prices (%d entries), aggregating to hourly averages",
+                total_entries,
+            )
+
+        return self._aggregate_subhourly_to_hourly(hourly_prices)
 
     def _update_battery_state(self) -> None:
         """Update calculated battery state values."""
