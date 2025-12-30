@@ -148,10 +148,16 @@ class SavingsTracker:
     total_grid_import_kwh: float = 0.0  # Total grid import
     total_grid_export_kwh: float = 0.0  # Total grid export
 
+    # PV vs Grid charging breakdown
+    total_pv_charged_kwh: float = 0.0  # Energy charged from PV
+    total_grid_charged_kwh: float = 0.0  # Energy charged from grid
+
     # Session values (reset on restart)
     session_savings_eur: float = 0.0
     session_charged_kwh: float = 0.0
     session_discharged_kwh: float = 0.0
+    session_pv_charged_kwh: float = 0.0
+    session_grid_charged_kwh: float = 0.0
 
     # Tracking for weighted average
     avg_charge_price: float = 0.0  # Weighted average price paid for charging
@@ -160,6 +166,8 @@ class SavingsTracker:
     # Today's values
     today_savings_eur: float = 0.0
     today_grid_cost_eur: float = 0.0
+    today_pv_charged_kwh: float = 0.0
+    today_grid_charged_kwh: float = 0.0
     today_date: str = ""
 
 

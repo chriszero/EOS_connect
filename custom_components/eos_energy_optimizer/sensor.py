@@ -252,6 +252,8 @@ SENSOR_DESCRIPTIONS: tuple[EOSSensorEntityDescription, ...] = (
             "total_feed_in_revenue": round(data.savings.total_feed_in_revenue_eur, 2),
             "total_charged_kwh": round(data.savings.total_charged_kwh, 2),
             "total_discharged_kwh": round(data.savings.total_discharged_kwh, 2),
+            "total_pv_charged_kwh": round(data.savings.total_pv_charged_kwh, 2),
+            "total_grid_charged_kwh": round(data.savings.total_grid_charged_kwh, 2),
             "total_grid_import_kwh": round(data.savings.total_grid_import_kwh, 2),
             "total_grid_export_kwh": round(data.savings.total_grid_export_kwh, 2),
         },
@@ -269,6 +271,36 @@ SENSOR_DESCRIPTIONS: tuple[EOSSensorEntityDescription, ...] = (
         attr_fn=lambda data: {
             "session_charged_kwh": round(data.savings.session_charged_kwh, 2),
             "session_discharged_kwh": round(data.savings.session_discharged_kwh, 2),
+            "session_pv_charged_kwh": round(data.savings.session_pv_charged_kwh, 2),
+            "session_grid_charged_kwh": round(data.savings.session_grid_charged_kwh, 2),
+        },
+    ),
+    EOSSensorEntityDescription(
+        key="pv_charged_today",
+        translation_key="pv_charged_today",
+        name="PV Charged Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        icon="mdi:solar-power",
+        value_fn=lambda data: round(data.savings.today_pv_charged_kwh, 2),
+        attr_fn=lambda data: {
+            "total_pv_charged_kwh": round(data.savings.total_pv_charged_kwh, 2),
+            "pv_charge_value_eur": round(data.savings.today_pv_charged_kwh * 0.08, 2),  # Opportunity cost
+        },
+    ),
+    EOSSensorEntityDescription(
+        key="grid_charged_today",
+        translation_key="grid_charged_today",
+        name="Grid Charged Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        icon="mdi:transmission-tower-import",
+        value_fn=lambda data: round(data.savings.today_grid_charged_kwh, 2),
+        attr_fn=lambda data: {
+            "total_grid_charged_kwh": round(data.savings.total_grid_charged_kwh, 2),
+            "grid_cost_today_eur": round(data.savings.today_grid_cost_eur, 2),
         },
     ),
     EOSSensorEntityDescription(

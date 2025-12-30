@@ -139,13 +139,20 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
             raise UpdateFailed(f"Error communicating with EOS: {err}") from err
 
     def _update_savings(self) -> None:
-        """Update savings based on battery SOC changes and current prices."""
+        """Update savings based on battery SOC changes and current prices.
+
+        Distinguishes between:
+        - PV charging: Cost = feed-in price (opportunity cost)
+        - Grid charging: Cost = current electricity price
+        - Discharging: Savings = (grid price - avg charge price) × energy
+        """
         data = self.api_client.data
         if not data.battery or not data.prices:
             return
 
         current_soc = data.battery.soc
         current_price = data.prices[0] if data.prices else 0.30
+        eos_mode = data.control.mode if data.control else InverterMode.AUTO
 
         # Check if day changed - reset today's values
         today = dt_util.now().strftime("%Y-%m-%d")
@@ -153,6 +160,8 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
             data.savings.today_date = today
             data.savings.today_savings_eur = 0.0
             data.savings.today_grid_cost_eur = 0.0
+            data.savings.today_pv_charged_kwh = 0.0
+            data.savings.today_grid_charged_kwh = 0.0
 
         # Skip first update (no previous SOC to compare)
         if self._last_soc is None:
@@ -169,26 +178,41 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
             return
 
         if energy_kwh > 0:
-            # Battery charged
+            # Battery charged - determine source (PV or Grid)
+            if eos_mode == InverterMode.CHARGE_FROM_GRID:
+                # Grid charging: use current electricity price
+                charge_price = current_price
+                source = "grid"
+                data.savings.total_grid_import_kwh += energy_kwh
+                data.savings.total_grid_cost_eur += energy_kwh * current_price
+                data.savings.today_grid_cost_eur += energy_kwh * current_price
+                data.savings.total_grid_charged_kwh += energy_kwh
+                data.savings.session_grid_charged_kwh += energy_kwh
+                data.savings.today_grid_charged_kwh += energy_kwh
+            else:
+                # PV charging: use feed-in price as opportunity cost
+                charge_price = self._feed_in_price
+                source = "PV"
+                data.savings.total_pv_charged_kwh += energy_kwh
+                data.savings.session_pv_charged_kwh += energy_kwh
+                data.savings.today_pv_charged_kwh += energy_kwh
+
             data.savings.total_charged_kwh += energy_kwh
             data.savings.session_charged_kwh += energy_kwh
 
             # Update weighted average charge price
-            if data.savings.total_charged_kwh > 0:
-                # Simple moving average for charge price
-                old_weight = data.savings.total_charged_kwh - energy_kwh
-                new_weight = energy_kwh
-                if old_weight > 0:
-                    data.savings.avg_charge_price = (
-                        (data.savings.avg_charge_price * old_weight + current_price * new_weight)
-                        / data.savings.total_charged_kwh
-                    )
-                else:
-                    data.savings.avg_charge_price = current_price
+            old_total = data.savings.total_charged_kwh - energy_kwh
+            if old_total > 0:
+                data.savings.avg_charge_price = (
+                    (data.savings.avg_charge_price * old_total + charge_price * energy_kwh)
+                    / data.savings.total_charged_kwh
+                )
+            else:
+                data.savings.avg_charge_price = charge_price
 
             _LOGGER.debug(
-                "Battery charged %.2f kWh at %.4f €/kWh (avg: %.4f €/kWh)",
-                energy_kwh, current_price, data.savings.avg_charge_price,
+                "Battery charged %.2f kWh from %s at %.4f €/kWh (avg: %.4f €/kWh)",
+                energy_kwh, source, charge_price, data.savings.avg_charge_price,
             )
 
         else:
@@ -197,10 +221,11 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
             data.savings.total_discharged_kwh += discharged_kwh
             data.savings.session_discharged_kwh += discharged_kwh
 
-            # Track discharge price
+            # Track discharge price (current grid price we're avoiding)
             data.savings.avg_discharge_price = current_price
 
             # Calculate savings: difference between current price and avg charge price
+            # This represents what we would have paid for grid power vs what we paid to charge
             if data.savings.avg_charge_price > 0:
                 price_diff = current_price - data.savings.avg_charge_price
                 savings = price_diff * discharged_kwh
@@ -210,8 +235,9 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
                 data.savings.today_savings_eur += savings
 
                 _LOGGER.debug(
-                    "Battery discharged %.2f kWh at %.4f €/kWh (charged at %.4f €/kWh) = %.2f € saved",
-                    discharged_kwh, current_price, data.savings.avg_charge_price, savings,
+                    "Battery discharged %.2f kWh at %.4f €/kWh (charged at %.4f €/kWh) = %.2f € %s",
+                    discharged_kwh, current_price, data.savings.avg_charge_price,
+                    abs(savings), "saved" if savings > 0 else "lost",
                 )
 
         self._last_soc = current_soc
