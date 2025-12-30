@@ -14,9 +14,13 @@ from homeassistant.util import dt as dt_util
 from .api import EOSApiClient, EOSData
 from .const import (
     CONF_15MIN_REFINEMENT_ENABLED,
+    CONF_BATTERY_CAPACITY,
     CONF_EVCC_ENABLED,
+    CONF_FEED_IN_PRICE,
     CONF_REFRESH_TIME,
     DEFAULT_15MIN_REFINEMENT_ENABLED,
+    DEFAULT_BATTERY_CAPACITY,
+    DEFAULT_FEED_IN_PRICE,
     DEFAULT_REFRESH_TIME,
     DOMAIN,
     EVCC_BATTERY_CHARGE,
@@ -49,6 +53,15 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
         )
         self._15min_unsub = None
         self._last_evcc_mode: str | None = None
+
+        # Savings tracking
+        self._last_soc: float | None = None
+        self._battery_capacity_wh = config_entry.data.get(
+            CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY
+        )
+        self._feed_in_price = config_entry.data.get(
+            CONF_FEED_IN_PRICE, DEFAULT_FEED_IN_PRICE
+        )
 
         refresh_minutes = config_entry.data.get(CONF_REFRESH_TIME, DEFAULT_REFRESH_TIME)
 
@@ -113,6 +126,9 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
             # Then run optimization
             await self.api_client.async_run_optimization()
 
+            # Track savings based on SOC changes
+            self._update_savings()
+
             # Sync EVCC battery mode with EOS optimization result
             if self._evcc_enabled:
                 await self._sync_evcc_battery_mode()
@@ -121,6 +137,84 @@ class EOSDataUpdateCoordinator(DataUpdateCoordinator[EOSData]):
 
         except Exception as err:
             raise UpdateFailed(f"Error communicating with EOS: {err}") from err
+
+    def _update_savings(self) -> None:
+        """Update savings based on battery SOC changes and current prices."""
+        data = self.api_client.data
+        if not data.battery or not data.prices:
+            return
+
+        current_soc = data.battery.soc
+        current_price = data.prices[0] if data.prices else 0.30
+
+        # Check if day changed - reset today's values
+        today = dt_util.now().strftime("%Y-%m-%d")
+        if data.savings.today_date != today:
+            data.savings.today_date = today
+            data.savings.today_savings_eur = 0.0
+            data.savings.today_grid_cost_eur = 0.0
+
+        # Skip first update (no previous SOC to compare)
+        if self._last_soc is None:
+            self._last_soc = current_soc
+            return
+
+        # Calculate energy flow from SOC change
+        soc_change = current_soc - self._last_soc
+        energy_wh = (soc_change / 100) * self._battery_capacity_wh
+        energy_kwh = energy_wh / 1000
+
+        if abs(energy_kwh) < 0.01:  # Skip tiny changes
+            self._last_soc = current_soc
+            return
+
+        if energy_kwh > 0:
+            # Battery charged
+            data.savings.total_charged_kwh += energy_kwh
+            data.savings.session_charged_kwh += energy_kwh
+
+            # Update weighted average charge price
+            if data.savings.total_charged_kwh > 0:
+                # Simple moving average for charge price
+                old_weight = data.savings.total_charged_kwh - energy_kwh
+                new_weight = energy_kwh
+                if old_weight > 0:
+                    data.savings.avg_charge_price = (
+                        (data.savings.avg_charge_price * old_weight + current_price * new_weight)
+                        / data.savings.total_charged_kwh
+                    )
+                else:
+                    data.savings.avg_charge_price = current_price
+
+            _LOGGER.debug(
+                "Battery charged %.2f kWh at %.4f €/kWh (avg: %.4f €/kWh)",
+                energy_kwh, current_price, data.savings.avg_charge_price,
+            )
+
+        else:
+            # Battery discharged
+            discharged_kwh = abs(energy_kwh)
+            data.savings.total_discharged_kwh += discharged_kwh
+            data.savings.session_discharged_kwh += discharged_kwh
+
+            # Track discharge price
+            data.savings.avg_discharge_price = current_price
+
+            # Calculate savings: difference between current price and avg charge price
+            if data.savings.avg_charge_price > 0:
+                price_diff = current_price - data.savings.avg_charge_price
+                savings = price_diff * discharged_kwh
+
+                data.savings.total_savings_eur += savings
+                data.savings.session_savings_eur += savings
+                data.savings.today_savings_eur += savings
+
+                _LOGGER.debug(
+                    "Battery discharged %.2f kWh at %.4f €/kWh (charged at %.4f €/kWh) = %.2f € saved",
+                    discharged_kwh, current_price, data.savings.avg_charge_price, savings,
+                )
+
+        self._last_soc = current_soc
 
     async def _sync_evcc_battery_mode(self) -> None:
         """Sync EVCC battery mode based on EOS optimization result.

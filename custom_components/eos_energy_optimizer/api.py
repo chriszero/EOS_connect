@@ -136,6 +136,34 @@ class EVCCState:
 
 
 @dataclass
+class SavingsTracker:
+    """Track energy cost savings from optimization."""
+
+    # Cumulative values (persist across restarts via HA restore)
+    total_savings_eur: float = 0.0  # Total savings in EUR
+    total_grid_cost_eur: float = 0.0  # Total grid import cost
+    total_feed_in_revenue_eur: float = 0.0  # Total feed-in revenue
+    total_charged_kwh: float = 0.0  # Total energy charged to battery
+    total_discharged_kwh: float = 0.0  # Total energy discharged from battery
+    total_grid_import_kwh: float = 0.0  # Total grid import
+    total_grid_export_kwh: float = 0.0  # Total grid export
+
+    # Session values (reset on restart)
+    session_savings_eur: float = 0.0
+    session_charged_kwh: float = 0.0
+    session_discharged_kwh: float = 0.0
+
+    # Tracking for weighted average
+    avg_charge_price: float = 0.0  # Weighted average price paid for charging
+    avg_discharge_price: float = 0.0  # Weighted average price when discharging
+
+    # Today's values
+    today_savings_eur: float = 0.0
+    today_grid_cost_eur: float = 0.0
+    today_date: str = ""
+
+
+@dataclass
 class EOSData:
     """All EOS data."""
 
@@ -143,6 +171,7 @@ class EOSData:
     battery: BatteryState = field(default_factory=BatteryState)
     evcc: EVCCState = field(default_factory=EVCCState)
     optimization: OptimizationResult = field(default_factory=OptimizationResult)
+    savings: SavingsTracker = field(default_factory=SavingsTracker)
     pv_forecast: list[float] = field(default_factory=list)
     prices: list[float] = field(default_factory=list)  # Hourly prices for EOS
     prices_15min: list[float] = field(default_factory=list)  # 15-min prices for refinement
