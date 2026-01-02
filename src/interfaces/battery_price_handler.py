@@ -259,7 +259,7 @@ class BatteryPriceHandler:
                 )
                 return weighted_price
 
-            logger.warning("[BATTERY-PRICE] No energy charged in identified events")
+            logger.info("[BATTERY-PRICE] No energy charged in identified events")
             return self.price_euro_per_wh
 
         except Exception as e:  # pylint: disable=broad-exception-caught

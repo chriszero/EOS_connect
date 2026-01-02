@@ -209,9 +209,9 @@ class BatteryInterface:
             else:
                 # Values > 1.0 are clearly percentage format (0-100).
                 soc = raw_value
-                logger.debug(
-                    "[BATTERY-IF] Detected percentage format (0-100): %s%%", soc
-                )
+                # logger.debug(
+                #     "[BATTERY-IF] Detected percentage format (0-100): %s%%", soc
+                # )
 
             self.soc_fail_count = 0
             return round(soc, 1)
