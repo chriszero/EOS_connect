@@ -39,6 +39,7 @@ Example:
 import logging
 import threading
 import time
+from datetime import datetime
 import requests
 from .battery_price_handler import BatteryPriceHandler
 
@@ -176,11 +177,11 @@ class BatteryInterface:
 
                     if diff_as_percent < diff_as_decimal:
                         soc = raw_value
-                        logger.debug(
-                            "[BATTERY-IF] Auto-detected percentage format "
-                            "(0-1) based on history: %s%%",
-                            soc,
-                        )
+                        # logger.debug(
+                        #     "[BATTERY-IF] Auto-detected percentage format "
+                        #     "(0-1) based on history: %s%%",
+                        #     soc,
+                        # )
                     else:
                         soc = raw_value * 100
                         logger.debug(
@@ -538,3 +539,69 @@ class BatteryInterface:
                 sleep_interval -= 1
 
         self.start_update_service()
+
+    def perform_initial_price_calculation(self):
+        """
+        Perform initial battery price calculation synchronously if enabled.
+        This should be called during startup before the first optimization run.
+
+        Returns:
+            bool: True if calculation completed successfully (or was not needed),
+                  False if calculation failed.
+        """
+        if not self.price_handler or not self.price_handler.price_calculation_enabled:
+            logger.info(
+                "[BATTERY-IF] Battery price calculation disabled - using static config value: %.6f €/Wh",
+                self.price_euro_per_wh,
+            )
+            return True
+
+        logger.info(
+            "[BATTERY-IF] Battery price calculation enabled - performing initial calculation..."
+        )
+        start_calc_time = time.time()
+
+        # Ensure we have current SOC and usable capacity before calculation
+        self.__battery_request_current_soc()
+        self.current_usable_capacity = max(
+            0,
+            (
+                self.battery_data.get("capacity_wh", 0)
+                * self.battery_data.get("discharge_efficiency", 1.0)
+                * (self.current_soc - self.battery_data.get("min_soc_percentage", 0))
+                / 100
+            ),
+        )
+
+        # **FIX: Set timestamp BEFORE calculation to prevent race condition**
+        self.price_handler.last_price_calculation = (
+            datetime.now(self.price_handler.timezone)
+            if self.price_handler.timezone
+            else datetime.now()
+        )
+
+        # Perform the calculation (full lookback, no workaround)
+        initial_price = self.price_handler.calculate_battery_price_from_history(
+            inventory_wh=self.current_usable_capacity
+        )
+
+        calc_duration = time.time() - start_calc_time
+
+        if initial_price is not None:
+            self.price_euro_per_wh = initial_price
+            # timestamp already set above
+            logger.info(
+                "[BATTERY-IF] Initial battery price calculated: %.6f €/Wh (%.4f €/kWh) in %.1f seconds",
+                initial_price,
+                initial_price * 1000,
+                calc_duration,
+            )
+            return True
+        else:
+            logger.warning(
+                "[BATTERY-IF] Initial battery price calculation failed after %.1f seconds - "
+                "using static config value: %.6f €/Wh",
+                calc_duration,
+                self.price_euro_per_wh,
+            )
+            return False

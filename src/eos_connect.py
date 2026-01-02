@@ -365,6 +365,10 @@ init_time = 3 + 1 * len(config_manager.config["pv_forecast"])
 logger.info("[Main] Waiting %s seconds for interfaces to initialize", init_time)
 time.sleep(init_time)
 
+# Perform initial battery price calculation if enabled (blocking, synchronous)
+# This ensures the first optimization run has the correct battery price
+battery_interface.perform_initial_price_calculation()
+
 # pv_interface.test_output()
 # sys.exit(0)  # exit if the interfaces are not initialized correctly
 

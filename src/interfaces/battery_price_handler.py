@@ -7,6 +7,7 @@ by analyzing historical charging events and attributing energy sources (PV vs Gr
 
 import logging
 from datetime import datetime, timedelta, tzinfo
+import threading
 from typing import Dict, List, Optional, Tuple, Any
 import pytz
 
@@ -79,7 +80,11 @@ class BatteryPriceHandler:
 
         # State
         self.price_euro_per_wh = self.price_euro_per_wh_accu
-        self.last_price_calculation: Optional[datetime] = None
+        self.last_price_calculation: Optional[datetime] = (
+            (datetime.now(self.timezone) if self.timezone else datetime.now())
+            if self.price_calculation_enabled
+            else None
+        )
         self.battery_power_convention: Optional[str] = None  # Will be auto-detected
         self.last_analysis_results = {
             "stored_energy_price": self.price_euro_per_wh_accu,
@@ -159,75 +164,39 @@ class BatteryPriceHandler:
                 round(inventory_wh, 1) if inventory_wh is not None else "N/A",
             )
 
-            # Fetch historical data - include all sensors if convention detection needed
-            keys_to_fetch = ["battery_power"]
-            detection_hours = min(24, lookback_hours)  # Use max 24 hours for detection
-            if self.battery_power_convention is None:
-                # Need all sensors for context-aware convention detection
-                keys_to_fetch = [
-                    "battery_power",
-                    "pv_power",
-                    "grid_power",
-                    "load_power",
-                ]
-                logger.info(
-                    "[BATTERY-PRICE] Convention not detected, fetching %sh of sensor data for analysis",
-                    detection_hours,
-                )
+            # Fetch all required sensors for the full lookback period
+            keys_to_fetch = [
+                "battery_power",
+                "pv_power",
+                "grid_power",
+                "load_power",
+                "price_data",
+            ]
 
-            # Fetch historical data - include all sensors if convention detection needed
-            keys_to_fetch = ["battery_power"]
-            detection_hours = min(24, lookback_hours)  # Use max 24 hours for detection
-            if self.battery_power_convention is None:
-                # Need all sensors for context-aware convention detection
-                keys_to_fetch = [
-                    "battery_power",
-                    "pv_power",
-                    "grid_power",
-                    "load_power",
-                ]
-                logger.info(
-                    "[BATTERY-PRICE] Convention not detected, fetching %sh of sensor data for analysis",
-                    detection_hours,
-                )
-
+            logger.debug("[BATTERY-PRICE] Fetching historical power data...")
             historical_data = self._fetch_historical_power_data(
-                (
-                    detection_hours
-                    if self.battery_power_convention is None
-                    else lookback_hours
-                ),
+                lookback_hours,
                 keys=keys_to_fetch,
             )
+            logger.debug("[BATTERY-PRICE] Historical power data fetch complete")
+
             if not historical_data or not historical_data.get("battery_power"):
                 logger.warning("[BATTERY-PRICE] No battery power data available")
                 self.last_analysis_results["last_update"] = self._get_now_iso()
                 return None
 
-            # If we did detection with limited data and need full data for analysis
-            if (
-                self.battery_power_convention is not None
-                and detection_hours < lookback_hours
-            ):
-                logger.info(
-                    "[BATTERY-PRICE] Convention detected, fetching full %sh of data for analysis",
-                    lookback_hours,
-                )
-                # Fetch the remaining sensors for the full period
-                full_data = self._fetch_historical_power_data(
-                    lookback_hours,
-                    keys=[
-                        "battery_power",
-                        "pv_power",
-                        "grid_power",
-                        "load_power",
-                        "price_data",
-                    ],
-                )
-                if full_data:
-                    historical_data.update(full_data)
+            # Log data points received
+            logger.debug(
+                "[BATTERY-PRICE] Data points received - Battery: %d, PV: %d, Grid: %d, Load: %d, Price: %d",
+                len(historical_data.get("battery_power", [])),
+                len(historical_data.get("pv_power", [])),
+                len(historical_data.get("grid_power", [])),
+                len(historical_data.get("load_power", [])),
+                len(historical_data.get("price_data", [])),
+            )
 
             # Reconstruct charging events
+            logger.debug("[BATTERY-PRICE] Identifying charging periods...")
             charging_events = self._identify_charging_periods(historical_data)
             logger.info(
                 "[BATTERY-PRICE] Found %s charging events", len(charging_events)
@@ -249,13 +218,15 @@ class BatteryPriceHandler:
                 }
                 return self.price_euro_per_wh
 
-            # Fetch historical data (Step 2: Other sensors for active ranges only)
-            self._fetch_missing_sensor_data(historical_data, charging_events)
-
             # Calculate costs per event
+            logger.debug(
+                "[BATTERY-PRICE] Calculating total costs for %d events...",
+                len(charging_events),
+            )
             results = self._calculate_total_costs(
                 charging_events, historical_data, lookback_hours, inventory_wh
             )
+            logger.debug("[BATTERY-PRICE] Cost calculation complete")
 
             total_cost = results["total_cost"]
             total_energy_charged = results["total_energy_charged"]
@@ -268,6 +239,7 @@ class BatteryPriceHandler:
             )
 
             # Store results for external reporting (ALWAYS)
+            logger.debug("[BATTERY-PRICE] Storing analysis results...")
             self.last_analysis_results = {
                 "stored_energy_price": round(weighted_price, 6),
                 "duration_of_analysis": lookback_hours,
@@ -291,7 +263,9 @@ class BatteryPriceHandler:
             return self.price_euro_per_wh
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("[BATTERY-PRICE] Error in historical calculation: %s", e)
+            logger.error(
+                "[BATTERY-PRICE] Error in historical calculation: %s", e, exc_info=True
+            )
             return None
 
     # pylint: disable=too-many-locals
@@ -480,9 +454,8 @@ class BatteryPriceHandler:
     def _fetch_via_load_interface(
         self, start_time: datetime, end_time: datetime, keys: Optional[List[str]] = None
     ) -> Optional[Dict]:
-        """Fetch data using LoadInterface."""
+        """Fetch data using LoadInterface with parallel sensor fetching."""
         try:
-            data = {}
             all_sensors = [
                 (self.battery_power_sensor, "battery_power"),
                 (self.pv_power_sensor, "pv_power"),
@@ -495,18 +468,56 @@ class BatteryPriceHandler:
             if keys:
                 sensors = [s for s in all_sensors if s[1] in keys]
 
-            for sensor, key in sensors:
+            # Parallel fetching with threading
+            fetch_results = {}
+            fetch_lock = threading.Lock()
+
+            def fetch_sensor_data(sensor, key):
+                """Thread worker to fetch data for a single sensor."""
                 try:
                     sensor_data = self.load_interface.fetch_historical_energy_data(
                         entity_id=sensor, start_time=start_time, end_time=end_time
                     )
                     converted_data = self._convert_historical_data(sensor_data, key)
-                    data[key] = converted_data
+                    with fetch_lock:
+                        fetch_results[key] = converted_data
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.warning("[BATTERY-PRICE] Failed to fetch %s: %s", key, e)
-                    data[key] = []
+                    with fetch_lock:
+                        fetch_results[key] = []
 
-            return data
+            # Create and start threads for parallel fetching
+            threads = []
+            logger.debug(
+                "[BATTERY-PRICE] Starting parallel fetch of %d sensors for %.1fh lookback",
+                len(sensors),
+                (end_time - start_time).total_seconds() / 3600,
+            )
+
+            for sensor, key in sensors:
+                thread = threading.Thread(
+                    target=fetch_sensor_data,
+                    args=(sensor, key),
+                    daemon=False,  # Changed to False
+                )
+                threads.append(thread)
+                thread.start()
+
+            # Wait for all threads to complete with timeout
+            for thread in threads:
+                thread.join(timeout=120)  # 2 minute timeout per thread
+                if thread.is_alive():
+                    logger.warning(
+                        "[BATTERY-PRICE] Thread timeout waiting for sensor fetch"
+                    )
+
+            logger.debug(
+                "[BATTERY-PRICE] Parallel fetch completed, retrieved %d/%d sensors",
+                sum(1 for v in fetch_results.values() if v),
+                len(sensors),
+            )
+
+            return fetch_results
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("[BATTERY-PRICE] LoadInterface fetch failed: %s", e)
@@ -566,11 +577,41 @@ class BatteryPriceHandler:
         if not battery_data:
             return "positive_charging"
 
+        # OPTIMIZATION: Sample only recent data for convention detection (last 24h is enough)
+        # This avoids O(n²) performance issue with 96h of data
+        logger.debug(
+            "[BATTERY-PRICE] Detecting battery power convention from recent data..."
+        )
+
+        # Take only the most recent 20% of data points (but at least 100 points)
+        sample_size = max(100, len(battery_data) // 5)
+        battery_sample = battery_data[-sample_size:]
+
         # Sort all data by timestamp for alignment
-        battery_data.sort(key=lambda x: x["timestamp"])
+        battery_sample.sort(key=lambda x: x["timestamp"])
         pv_data.sort(key=lambda x: x["timestamp"])
         grid_data.sort(key=lambda x: x["timestamp"])
         load_data.sort(key=lambda x: x["timestamp"])
+
+        # Get time range of sample
+        if battery_sample:
+            sample_start = battery_sample[0]["timestamp"]
+            sample_end = battery_sample[-1]["timestamp"]
+
+            # Filter other sensors to same time range to reduce search space
+            pv_data_filtered = [
+                p for p in pv_data if sample_start <= p["timestamp"] <= sample_end
+            ]
+            grid_data_filtered = [
+                p for p in grid_data if sample_start <= p["timestamp"] <= sample_end
+            ]
+            load_data_filtered = [
+                p for p in load_data if sample_start <= p["timestamp"] <= sample_end
+            ]
+        else:
+            pv_data_filtered = pv_data
+            grid_data_filtered = grid_data
+            load_data_filtered = load_data
 
         # Counters for contextual charging events
         evcc_charging_count = 0  # negative battery power + energy available
@@ -578,7 +619,7 @@ class BatteryPriceHandler:
 
         threshold = self.charging_threshold_w
 
-        for battery_point in battery_data:
+        for battery_point in battery_sample:
             battery_power = battery_point.get("value", 0)
             timestamp = battery_point["timestamp"]
 
@@ -587,30 +628,35 @@ class BatteryPriceHandler:
                 continue
 
             # Check if energy is available for charging at this timestamp
-            grid_power = self._get_value_at_timestamp(grid_data, timestamp)
-            pv_power = self._get_value_at_timestamp(pv_data, timestamp)
-            load_power = self._get_value_at_timestamp(load_data, timestamp)
+            grid_power = self._get_value_at_timestamp(grid_data_filtered, timestamp)
+            pv_power = self._get_value_at_timestamp(pv_data_filtered, timestamp)
+            load_power = self._get_value_at_timestamp(load_data_filtered, timestamp)
 
             # Determine if there's surplus energy available
-            # Grid import indicates energy available for charging
             grid_importing = grid_power > threshold
-            # PV surplus: PV producing more than load (with some margin for battery charging)
             pv_surplus = pv_power > (load_power + threshold)
 
             energy_available = grid_importing or pv_surplus
 
             if energy_available:
-                if battery_power < 0:
-                    evcc_charging_count += 1  # EVCC: negative = charging
-                elif battery_power > 0:
-                    standard_charging_count += 1  # Standard: positive = charging
+                if battery_power < -threshold:
+                    evcc_charging_count += 1
+                elif battery_power > threshold:
+                    standard_charging_count += 1
 
         # Determine convention based on contextual charging events
         total_contextual_events = evcc_charging_count + standard_charging_count
 
+        logger.debug(
+            "[BATTERY-PRICE] Convention detection: %d standard, %d EVCC events from %d samples",
+            standard_charging_count,
+            evcc_charging_count,
+            len(battery_sample),
+        )
+
         if total_contextual_events < 3:
             # Not enough contextual data, fall back to simple heuristic
-            return self._fallback_convention_detection(battery_data)
+            return self._fallback_convention_detection(battery_sample)
         elif evcc_charging_count > standard_charging_count:
             return "negative_charging"
         else:
