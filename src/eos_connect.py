@@ -345,6 +345,7 @@ battery_interface = BatteryInterface(
     on_bat_max_changed=None,
     load_interface=load_interface,
     timezone=time_zone,
+    base_control=base_control,
 )
 
 price_interface = PriceInterface(

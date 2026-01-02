@@ -373,12 +373,49 @@ class BaseControl:
         """
         Sets the current overall state and logs the timestamp if it changes.
         """
+        # Check for changes in demands or battery limits FIRST
+        changes = [
+            (
+                "AC charge demand",
+                self.current_ac_charge_demand,
+                self.last_ac_charge_demand,
+            ),
+            (
+                "DC charge demand",
+                self.current_dc_charge_demand,
+                self.last_dc_charge_demand,
+            ),
+            (
+                "Battery charge max",
+                self.current_bat_charge_max,
+                self.last_bat_charge_max,
+            ),
+        ]
+        value_changed = any(curr != last for _, curr, last in changes)
+
         if self.override_active:
             # check if the override end time is reached
             if time.time() > self.override_end_time:
                 logger.info("[BASE-CTRL] OVERRIDE end time reached, clearing override")
                 self.clear_mode_override()
                 return
+
+            # IMPORTANT: Even during override, we must record value changes
+            # so that was_overall_state_changed_recently() returns True
+            if value_changed:
+                self._state_change_timestamps.append(time.time())
+                for name, curr, last in changes:
+                    if curr != last:
+                        logger.info(
+                            "[BASE-CTRL] %s changed to %s W (Override active)",
+                            name,
+                            curr,
+                        )
+
+                # Update last values to prevent repeated triggers
+                self.last_ac_charge_demand = self.current_ac_charge_demand
+                self.last_dc_charge_demand = self.current_dc_charge_demand
+                self.last_bat_charge_max = self.current_bat_charge_max
             return
 
         # Determine base state
@@ -416,13 +453,15 @@ class BaseControl:
                     new_state = MODE_CHARGE_FROM_GRID_EVCC_FAST
                     if self.current_overall_state != new_state:
                         logger.info(
-                            "[BASE-CTRL] EVCC charging state is active, setting overall state to MODE_CHARGE_FROM_GRID_EVCC_FAST"
+                            "[BASE-CTRL] EVCC charging state is active, setting overall"
+                            + " state to MODE_CHARGE_FROM_GRID_EVCC_FAST"
                         )
                 else:
                     new_state = evcc_override[mode]
                     if self.current_overall_state != new_state:
                         logger.info(
-                            "[BASE-CTRL] EVCC charging state is active, setting overall state to %s",
+                            "[BASE-CTRL] EVCC charging state is active, setting overall"
+                            + " state to %s",
                             state_mapping.get(new_state, "unknown state"),
                         )
 

@@ -65,7 +65,12 @@ class BatteryInterface:
     """
 
     def __init__(
-        self, config, on_bat_max_changed=None, load_interface=None, timezone=None
+        self,
+        config,
+        on_bat_max_changed=None,
+        load_interface=None,
+        timezone=None,
+        base_control=None,
     ):
         self.src = config.get("source", "default")
         self.url = config.get("url", "")
@@ -78,6 +83,7 @@ class BatteryInterface:
         self.current_soc = 0
         self.current_usable_capacity = 0
         self.on_bat_max_changed = on_bat_max_changed
+        self.base_control = base_control  # Store reference to base_control
         self.min_soc_set = config.get("min_soc_percentage", 0)
         self.max_soc_set = config.get("max_soc_percentage", 100)
         self.price_euro_per_wh = float(config.get("price_euro_per_wh_accu", 0.0))
@@ -471,6 +477,10 @@ class BatteryInterface:
                 "[BATTERY-IF] Max dynamic charge power changed to %s W",
                 self.max_charge_power_dyn,
             )
+            # Inform BaseControl directly if available
+            if self.base_control:
+                self.base_control.set_current_bat_charge_max(self.max_charge_power_dyn)
+
             if self.on_bat_max_changed:
                 self.on_bat_max_changed()
 
