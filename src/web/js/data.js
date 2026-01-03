@@ -176,9 +176,34 @@ class DataManager {
                 };
             }
         } else if (responseData && responseData["status"]) {
+            const status = String(responseData["status"] || "").toLowerCase();
+
+            // Special handling for EVopt "Infeasible" payloads
+            if (status === "infeasible") {
+                let messageParts = [];
+
+                if (responseData["message"]) {
+                    messageParts.push(responseData["message"]);
+                }
+
+                const lv = responseData["limit_violations"] || {};
+                const lv_parts = [];
+                if (lv.grid_import_limit_exceeded) lv_parts.push("grid import limit exceeded");
+                if (lv.grid_export_limit_hit) lv_parts.push("grid export limit hit");
+                if (lv_parts.length) messageParts.push("Limit violations: " + lv_parts.join(", "));
+
+                // Helpful hint for common cause (initial SOC > configured max)
+                messageParts.push("Hint: check battery initial SOC vs configured max_soc_percentage (initial SOC reported may exceed configured limit).");
+
+                return {
+                    title: "Optimization infeasible",
+                    message: messageParts.join(" ")
+                };
+            }
+
             return {
                 title: responseData["status"],
-                message: responseData["message"]
+                message: responseData["message"] || ""
             };
         } else {
             return {

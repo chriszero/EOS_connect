@@ -175,6 +175,20 @@ class LoadInterface:
                 time.sleep(sleep_seconds)
 
     # get load data from url persistance source
+    def fetch_historical_energy_data(self, entity_id, start_time, end_time):
+        """
+        Public wrapper to fetch historical energy data from the configured source.
+        """
+        if self.src == "homeassistant":
+            return self.__fetch_historical_energy_data_from_homeassistant(
+                entity_id, start_time, end_time
+            )
+        elif self.src == "openhab":
+            return self.__fetch_historical_energy_data_from_openhab(
+                entity_id, start_time, end_time
+            )
+        return []
+
     def __fetch_historical_energy_data_from_openhab(
         self, openhab_item, start_time, end_time
     ):
@@ -363,7 +377,8 @@ class LoadInterface:
         if len(data["data"]) > 0 and total_duration > 0:
             # Get the timestamp of the last sample
             last_sample_time = datetime.fromisoformat(data["data"][-1]["last_updated"])
-            # The interval end is the latest timestamp in the interval (should be provided externally)
+            # The interval end is the latest timestamp in the interval
+            # (should be provided externally)
             # If not available, assume the interval is 1 hour after the first sample
             interval_end = None
             if "interval_end" in data:

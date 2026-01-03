@@ -7,6 +7,7 @@ and control methods of the BatteryInterface.
 
 from unittest.mock import patch, MagicMock
 import pytest
+import requests
 from src.interfaces.battery_interface import BatteryInterface
 
 # Accessing protected members is fine in white-box tests.
@@ -28,6 +29,8 @@ def default_config():
         "max_soc_percentage": 90,
         "charging_curve_enabled": True,
         "discharge_efficiency": 1.0,
+        "price_euro_per_wh_accu": 0.0,
+        "price_euro_per_wh_sensor": "",
     }
 
 
@@ -65,7 +68,7 @@ def test_openhab_fetch_success(default_config):
         mock_resp.json.return_value = {"state": "80"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_openhab()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 80
 
 
@@ -83,7 +86,7 @@ def test_openhab_fetch_decimal_format(default_config):
         mock_resp.json.return_value = {"state": "0.75"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_openhab()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 75.0
 
 
@@ -102,8 +105,127 @@ def test_homeassistant_fetch_success(default_config):
         mock_resp.json.return_value = {"state": "55"}
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
-        soc = bi._BatteryInterface__fetch_soc_data_from_homeassistant()
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
         assert soc == 55.0
+
+
+def test_homeassistant_price_sensor_success(default_config):
+    """
+    Ensure the Home Assistant price sensor value is fetched and stored.
+    """
+    test_config = default_config.copy()
+    test_config.update(
+        {
+            "url": "http://fake",
+            "access_token": "token",
+            "source": "homeassistant",
+            "price_euro_per_wh_sensor": "sensor.accu_price",
+        }
+    )
+    with patch("src.interfaces.battery_interface.requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"state": "0.002"}
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+        bi = BatteryInterface(test_config)
+        # Ensure manual update works and the getter reflects the sensor value
+        bi._BatteryInterface__update_price_euro_per_wh()
+        assert bi.get_price_euro_per_wh() == pytest.approx(0.002)
+        bi.shutdown()
+
+
+def test_homeassistant_price_sensor_failure_keeps_last_value(default_config):
+    """
+    Ensure failing sensor updates keep the last configured price.
+    """
+    test_config = default_config.copy()
+    test_config.update(
+        {
+            "url": "http://fake",
+            "access_token": "token",
+            "source": "homeassistant",
+            "price_euro_per_wh_sensor": "sensor.accu_price",
+            "price_euro_per_wh_accu": 0.001,
+        }
+    )
+    with patch(
+        "src.interfaces.battery_interface.requests.get",
+        side_effect=requests.exceptions.RequestException("boom"),
+    ):
+        bi = BatteryInterface(test_config)
+        bi._BatteryInterface__update_price_euro_per_wh()
+        assert bi.get_price_euro_per_wh() == pytest.approx(0.001)
+        bi.shutdown()
+
+
+def test_openhab_price_sensor_success(default_config):
+    """
+    Ensure the OpenHAB price item value is fetched and stored.
+    """
+    test_config = default_config.copy()
+    test_config.update(
+        {
+            "url": "http://fake",
+            "source": "openhab",
+            "price_euro_per_wh_sensor": "BatteryPrice",
+        }
+    )
+    with patch("src.interfaces.battery_interface.requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"state": "0.00015"}
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+        bi = BatteryInterface(test_config)
+        # Ensure manual update works and the getter reflects the item value
+        bi._BatteryInterface__update_price_euro_per_wh()
+        assert bi.get_price_euro_per_wh() == pytest.approx(0.00015)
+        bi.shutdown()
+
+
+def test_openhab_price_sensor_with_unit_success(default_config):
+    """
+    Ensure OpenHAB price item with unit (e.g., "0.00015 €/Wh") is parsed correctly.
+    """
+    test_config = default_config.copy()
+    test_config.update(
+        {
+            "url": "http://fake",
+            "source": "openhab",
+            "price_euro_per_wh_sensor": "BatteryPrice",
+        }
+    )
+    with patch("src.interfaces.battery_interface.requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"state": "0.00015 €/Wh"}
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+        bi = BatteryInterface(test_config)
+        bi._BatteryInterface__update_price_euro_per_wh()
+        assert bi.get_price_euro_per_wh() == pytest.approx(0.00015)
+        bi.shutdown()
+
+
+def test_openhab_price_sensor_failure_keeps_last_value(default_config):
+    """
+    Ensure failing OpenHAB item updates keep the last configured price.
+    """
+    test_config = default_config.copy()
+    test_config.update(
+        {
+            "url": "http://fake",
+            "source": "openhab",
+            "price_euro_per_wh_sensor": "BatteryPrice",
+            "price_euro_per_wh_accu": 0.0001,
+        }
+    )
+    with patch(
+        "src.interfaces.battery_interface.requests.get",
+        side_effect=requests.exceptions.RequestException("boom"),
+    ):
+        bi = BatteryInterface(test_config)
+        bi._BatteryInterface__update_price_euro_per_wh()
+        assert bi.get_price_euro_per_wh() == pytest.approx(0.0001)
+        bi.shutdown()
 
 
 def test_soc_error_handling(default_config):
@@ -153,3 +275,79 @@ def test_shutdown_stops_thread(default_config):
     bi = BatteryInterface(default_config)
     bi.shutdown()
     assert not bi._update_thread.is_alive()
+
+
+def test_soc_autodetect_first_run_1_0_is_1_percent(default_config):
+    """On first run (current_soc=0), 1.0 should be treated as 1% (percentage format)."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 1.0
+
+
+def test_soc_autodetect_first_run_0_5_is_50_percent(default_config):
+    """On first run (current_soc=0), other values <= 1.0 (like 0.5) should be treated as decimal (50%)."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="0.5"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 50.0
+
+
+def test_soc_autodetect_ambiguous_1_0_as_1_percent(default_config):
+    """If current_soc is low (e.g. 0.9), 1.0 should be detected as 1%."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 0.9
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 1.0
+
+
+def test_soc_autodetect_ambiguous_1_0_as_100_percent(default_config):
+    """If current_soc is high (e.g. 99.0), 1.0 should be detected as 100%."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 99.0
+
+    with patch.object(bi, "_BatteryInterface__fetch_remote_state", return_value="1.0"):
+        soc = bi._BatteryInterface__fetch_soc_data_unified()
+        assert soc == 100.0
+
+
+def test_soc_autodetect_sweep_decimal(default_config):
+    """Test a sweep from 0.0 to 1.0 (decimal format) with optimized steps."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 50.0
+
+    for i in range(10, 101, 5):
+        val = i / 100.0
+        with patch.object(
+            bi, "_BatteryInterface__fetch_remote_state", return_value=str(val)
+        ):
+            soc = bi._BatteryInterface__fetch_soc_data_unified()
+            assert soc == float(i)
+            bi.current_soc = soc
+
+
+def test_soc_autodetect_sweep_percentage(default_config):
+    """Test a sweep from 0 to 100 (percentage format) with optimized steps."""
+    bi = BatteryInterface(default_config)
+    bi.shutdown()
+    bi.current_soc = 5.0
+
+    for i in range(10, 101, 5):
+        val = float(i)
+        with patch.object(
+            bi, "_BatteryInterface__fetch_remote_state", return_value=str(val)
+        ):
+            soc = bi._BatteryInterface__fetch_soc_data_unified()
+            assert soc == float(i)
+            bi.current_soc = soc

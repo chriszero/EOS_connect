@@ -1142,22 +1142,15 @@ class PvInterface:
         url = self.config_special.get("url", "").rstrip("/") + "/api/state"
         logger.debug("[PV-IF] Fetching PV forecast from EVCC API: %s", url)
 
-        def request_func():
+        def request_and_parse():
+            """
+            Perform the GET request and parse the EVCC JSON payload.
+            This keeps request and parsing in the same retried closure so
+            _retry_request never returns a non-Response that would later
+            be used as if it were a Response object.
+            """
             response = requests.get(url, timeout=5)
             response.raise_for_status()
-            return response
-
-        def error_handler(error_type, exception):
-            return self._handle_interface_error(
-                error_type,
-                f"EVCC API error: {exception}",
-                pv_config_entry,
-                "evcc",
-            )
-
-        response = self._retry_request(request_func, error_handler)
-
-        def json_func():
             data = response.json()
             solar_forecast_all = data.get("forecast", {}).get("solar", {})
             solar_forecast_scale = solar_forecast_all.get("scale", "unknown")
@@ -1168,7 +1161,15 @@ class PvInterface:
             )
             return solar_forecast, solar_forecast_scale
 
-        result = self._retry_request(json_func, error_handler)
+        def error_handler(error_type, exception):
+            return self._handle_interface_error(
+                error_type,
+                f"EVCC API error: {exception}",
+                pv_config_entry,
+                "evcc",
+            )
+
+        result = self._retry_request(request_and_parse, error_handler)
         if not result:
             return self._handle_interface_error(
                 "no_valid_data",

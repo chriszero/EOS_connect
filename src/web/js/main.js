@@ -69,6 +69,29 @@ async function showCurrentData() {
     document.getElementById('battery_usable_capacity').innerHTML = '<i class="fa-solid fa-database"></i> ' + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + ' <span style="font-size: 0.6em;">kWh</span>';
     document.getElementById('battery_usable_capacity').title = "usable capacity: " + (data_controls["battery"]["usable_capacity"] / 1000).toFixed(1) + " kWh";
 
+    // Add click events for battery overview if not already present
+    const batterySoc = document.getElementById('battery_soc');
+    const batteryUsable = document.getElementById('battery_usable_capacity');
+    const batteryIcon = document.getElementById('battery_icon_main');
+
+    if (batterySoc && !batterySoc.onclick) {
+        batterySoc.onclick = () => batteryManager.showBatteryOverview();
+        batterySoc.title = "Click to open Battery Overview";
+    }
+    if (batteryUsable && !batteryUsable.onclick) {
+        batteryUsable.onclick = () => batteryManager.showBatteryOverview();
+        // Keep existing title but append info
+        const currentTitle = batteryUsable.title;
+        if (!currentTitle.includes("Click")) {
+            batteryUsable.title = currentTitle + " - Click to open Battery Overview";
+        }
+    }
+    if (batteryIcon && !batteryIcon.onclick) {
+        batteryIcon.onclick = () => batteryManager.showBatteryOverview();
+        batteryIcon.style.cursor = 'pointer';
+        batteryIcon.title = "Click to open Battery Overview";
+    }
+
     // timestamp and version
     const timestamp_last_run = new Date(data_controls.state.last_response_timestamp);
     const timestamp_next_run = new Date(data_controls.state.next_run);
