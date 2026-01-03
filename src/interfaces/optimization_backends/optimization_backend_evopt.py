@@ -95,6 +95,40 @@ class EVOptBackend:
             avg_runtime = sum(self.last_optimization_runtimes) / 5
             evopt_response = response.json()
 
+            # Guard: EVopt can return a 200 with an infeasible/error status in the payload.
+            try:
+                if isinstance(evopt_response, dict):
+                    resp_status = evopt_response.get("status") or evopt_response.get(
+                        "result", {}
+                    ).get("status")
+                    if (
+                        isinstance(resp_status, str)
+                        and resp_status.lower() == "infeasible"
+                    ):
+                        logger.warning(
+                            "[EVopt] Server returned infeasible result; "
+                            "returning safe EOS infeasible payload: %s",
+                            evopt_response,
+                        )
+                        infeasible_eos = {
+                            "status": "Infeasible",
+                            "objective_value": None,
+                            "limit_violations": evopt_response.get(
+                                "limit_violations", {}
+                            ),
+                            "batteries": [],
+                            "grid_import": [],
+                            "grid_export": [],
+                            "flow_direction": [],
+                            "grid_import_overshoot": [],
+                            "grid_export_overshoot": [],
+                        }
+                        return infeasible_eos, avg_runtime
+            except (KeyError, TypeError, AttributeError) as _err:
+                logger.debug(
+                    "[EVopt] Could not evaluate evopt_response status: %s", _err
+                )
+
             # Optionally, write transformed payload to json file for debugging
             debug_path = os.path.join(
                 os.path.dirname(__file__),
@@ -155,6 +189,12 @@ class EVOptBackend:
         price_series = ems.get("strompreis_euro_pro_wh", []) or []
         feed_series = ems.get("einspeiseverguetung_euro_pro_wh", []) or []
         load_series = ems.get("gesamtlast", []) or []
+        # price for energy currently stored in the accu (EUR/Wh) - be defensive
+        price_accu_wh_raw = ems.get("preis_euro_pro_wh_akku", 0.0)
+        try:
+            price_accu_wh = float(price_accu_wh_raw)
+        except (TypeError, ValueError):
+            price_accu_wh = 0.0
 
         now = datetime.now(self.time_zone)
         if self.time_frame_base == 900:
@@ -219,6 +259,35 @@ class EVOptBackend:
         s_max = batt_capacity_wh * (batt_max_pct / 100.0)
         s_initial = batt_capacity_wh * (batt_initial_pct / 100.0)
 
+        # Ensure initial SOC lies within configured bounds
+        try:
+            if s_max is not None and s_initial > s_max:
+                logger.warning(
+                    "[EVopt] initial_soc (%.2f Wh, %.2f%%) > s_max (%.2f Wh, %.2f%%); "
+                    "clamping to s_max",
+                    s_initial,
+                    batt_initial_pct,
+                    s_max,
+                    batt_max_pct,
+                )
+                s_initial = s_max
+            if s_min is not None and s_initial < s_min:
+                logger.warning(
+                    "[EVopt] initial_soc (%.2f Wh, %.2f%%) < s_min (%.2f Wh, %.2f%%); "
+                    "clamping to s_min",
+                    s_initial,
+                    batt_initial_pct,
+                    s_min,
+                    batt_min_pct,
+                )
+                s_initial = s_min
+        except (TypeError, ValueError):
+            # defensive: if any unexpected non-numeric types are present, leave values unchanged
+            logger.warning(
+                "[EVopt] Battery SOC values are not numeric. Please check 'pv_akku' "
+                "configuration; leaving SOC values unchanged."
+            )
+
         batteries = []
         if batt_capacity_wh > 0:
             batteries.append(
@@ -235,7 +304,7 @@ class EVOptBackend:
                     "c_min": 0.0,
                     "c_max": batt_c_max,
                     "d_max": batt_c_max,
-                    "p_a": 0.0,
+                    "p_a": price_accu_wh,
                 }
             )
 

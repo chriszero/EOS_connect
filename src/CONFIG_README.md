@@ -8,6 +8,7 @@
     - [EOS Server Configuration](#eos-server-configuration)
     - [Electricity Price Configuration](#electricity-price-configuration)
     - [Battery Configuration](#battery-configuration)
+      - [Dynamic Battery Price Calculation](#dynamic-battery-price-calculation)
     - [PV Forecast Configuration](#pv-forecast-configuration)
       - [PV Forecast Source](#pv-forecast-source)
       - [PV Forecast installations](#pv-forecast-installations)
@@ -197,14 +198,68 @@ A default config file will be created with the first start, if there is no `conf
 - **`battery.max_soc_percentage`**:  
   Maximum state of charge for the battery, as a percentage.
 
-- **`price_euro_per_wh_accu`**:
-  Price for battery in €/Wh - can be used to shift the result over the day according to the available energy (more details follow).
-
 - **`battery.charging_curve_enabled`**:  
   Enables or disables the dynamic charging curve for the battery.  
   - `true`: The system will automatically reduce the maximum charging power as the battery SOC increases, helping to protect battery health and optimize efficiency.  
   - `false`: The battery will always charge at the configured maximum power, regardless of SOC.  
   - **Default:** `true`
+
+- **`battery.price_euro_per_wh_accu`**:
+  Price for battery in €/Wh - can be used to shift the result over the day according to the available energy (more details follow).
+
+
+- **`battery.price_euro_per_wh_sensor`**:  
+ Sensor/item identifier that exposes the battery price in €/Wh. If `battery.source` is set to `homeassistant` or `openhab` and a sensor/item is configured here, the system will fetch the value from that sensor/item. If no sensor is configured, the static value at `price_euro_per_wh_accu` will be used. For Home Assistant use an entity ID (e.g., `sensor.battery_price`); for OpenHAB use an item name (e.g., `BatteryPrice`).
+
+- **`battery.price_calculation_enabled`**:  
+  Enables dynamic battery price calculation by analyzing historical charging events.  
+  - `true`: The system will analyze the last 96 hours (configurable) of power data to determine the real cost of energy stored in the battery.  
+  - `false`: Uses the static price or sensor value.  
+  - **Default:** `false`
+
+- **`battery.price_update_interval`**:  
+  Interval in seconds between dynamic price recalculations.  
+  - **Default:** `900` (15 minutes)
+
+- **`battery.price_history_lookback_hours`**:  
+  Number of hours of history to analyze for the price calculation.  
+  - **Default:** `96`
+
+- **`battery.battery_power_sensor`**:  
+  Home Assistant entity ID or OpenHAB item name for the battery power sensor (in Watts). Positive values must represent charging.
+
+- **`battery.pv_power_sensor`**:  
+  Home Assistant entity ID or OpenHAB item name for the total PV power sensor (in Watts).
+
+- **`battery.grid_power_sensor`**:  
+  Home Assistant entity ID or OpenHAB item name for the grid power sensor (in Watts). Positive values represent import from the grid.
+
+- **`battery.load_power_sensor`**:  
+  Home Assistant entity ID or OpenHAB item name for the household load power sensor (in Watts).
+
+- **`battery.price_sensor`**:  
+  Home Assistant entity ID or OpenHAB item name for the current electricity price sensor (in €/kWh or ct/kWh).
+
+- **`battery.charging_threshold_w`**:  
+  Minimum battery power in Watts to consider the battery as "charging" during historical analysis.  
+  - **Default:** `50.0`
+
+- **`battery.grid_charge_threshold_w`**:  
+  Minimum grid import power in Watts to attribute charging energy to the grid rather than PV surplus.  
+  - **Default:** `100.0`
+
+
+
+#### Dynamic Battery Price Calculation
+
+When `price_calculation_enabled` is set to `true`, the system performs a detailed analysis of your battery's charging history to determine the real cost of the energy currently stored.
+
+**How it works:**
+1. **Event Detection:** The system scans historical data (default 48h) to identify "charging events" where the battery power was above the `charging_threshold_w`.
+2. **Source Attribution:** For each event, it compares battery power with PV production and Grid import. If grid import is significant (above `grid_charge_threshold_w`), the energy is attributed to the grid at the current market price. Otherwise, it is attributed to PV surplus at the `feed_in_price` (opportunity cost).
+3. **Inventory Valuation (LIFO):** Instead of a simple average, the system uses a **Last-In, First-Out** model. It looks at the most recent charging sessions that match your current battery level. This ensures the price reflects the actual "value" of the energy currently inside the battery.
+4. **Optimizer Integration:** This resulting price is used by the optimizer to decide when it is profitable to discharge the battery.
+5. **Efficiency:** To minimize API load, the system uses a two-step fetching strategy: it first fetches low-resolution data to find events, and then high-resolution data only for the specific periods when the battery was actually charging.
 
 ---
 
@@ -471,6 +526,7 @@ battery:
   min_soc_percentage: 5 # URL for battery soc in %
   max_soc_percentage: 100 # URL for battery soc in %
   price_euro_per_wh_accu: 0 # price for battery in €/Wh
+  price_euro_per_wh_sensor: "" # Home Assistant entity (e.g. sensor.battery_price) providing €/Wh
   charging_curve_enabled: true # enable dynamic charging curve for battery
 # List of PV forecast source configuration
 pv_forecast_source:

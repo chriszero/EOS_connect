@@ -347,6 +347,9 @@ load_interface = LoadInterface(
 battery_interface = BatteryInterface(
     config_manager.config["battery"],
     on_bat_max_changed=None,
+    load_interface=load_interface,
+    timezone=time_zone,
+    base_control=base_control,
 )
 
 price_interface = PriceInterface(
@@ -365,6 +368,10 @@ pv_interface = PvInterface(
 init_time = 3 + 1 * len(config_manager.config["pv_forecast"])
 logger.info("[Main] Waiting %s seconds for interfaces to initialize", init_time)
 time.sleep(init_time)
+
+# Perform initial battery price calculation if enabled (blocking, synchronous)
+# This ensures the first optimization run has the correct battery price
+battery_interface.perform_initial_price_calculation()
 
 # pv_interface.test_output()
 # sys.exit(0)  # exit if the interfaces are not initialized correctly
@@ -497,13 +504,25 @@ def create_optimize_request():
             "pv_prognose_wh": pv_prognose_wh,
             "strompreis_euro_pro_wh": strompreis_euro_pro_wh,
             "einspeiseverguetung_euro_pro_wh": einspeiseverguetung_euro_pro_wh,
-            "preis_euro_pro_wh_akku": config_manager.config["battery"][
-                "price_euro_per_wh_accu"
-            ],
+            "preis_euro_pro_wh_akku": battery_interface.get_price_euro_per_wh(),
             "gesamtlast": gesamtlast,
         }
 
     def get_pv_akku_data():
+        # Use dynamic max charge power if charging curve is enabled, otherwise use fixed value
+        # This ensures EVopt receives realistic charging limits based on current SOC
+        current_dynamic_max = battery_interface.get_max_charge_power()
+        max_charge_power = (
+            current_dynamic_max
+            if config_manager.config["battery"].get("charging_curve_enabled", True)
+            else config_manager.config["battery"]["max_charge_power_w"]
+        )
+
+        # Store this value in base_control so it can use the same value when
+        # converting relative charge demands back to absolute values
+        # This prevents sawtooth patterns caused by mismatched max_charge_power values
+        base_control.optimization_max_charge_power_w = max_charge_power
+
         akku_object = {
             "capacity_wh": config_manager.config["battery"]["capacity_wh"],
             "charging_efficiency": config_manager.config["battery"][
@@ -512,9 +531,7 @@ def create_optimize_request():
             "discharging_efficiency": config_manager.config["battery"][
                 "discharge_efficiency"
             ],
-            "max_charge_power_w": config_manager.config["battery"][
-                "max_charge_power_w"
-            ],
+            "max_charge_power_w": max_charge_power,
             "initial_soc_percentage": round(battery_interface.get_current_soc()),
             "min_soc_percentage": battery_interface.get_min_soc(),
             "max_soc_percentage": battery_interface.get_max_soc(),
@@ -642,24 +659,27 @@ def setting_control_data(ac_charge_demand_rel, dc_charge_demand_rel, discharge_a
     base_control.set_current_ac_charge_demand(ac_charge_demand_rel)
     base_control.set_current_dc_charge_demand(dc_charge_demand_rel)
     base_control.set_current_discharge_allowed(bool(discharge_allowed))
-    mqtt_interface.update_publish_topics(
-        {
-            "control/eos_ac_charge_demand": {
-                "value": base_control.get_current_ac_charge_demand()
-            },
-            "control/eos_dc_charge_demand": {
-                "value": base_control.get_current_dc_charge_demand()
-            },
-            "control/eos_discharge_allowed": {
-                "value": base_control.get_current_discharge_allowed()
-            },
-        }
-    )
+
     # set the current battery state of charge
     base_control.set_current_battery_soc(battery_interface.get_current_soc())
     # getting the current charging state from evcc
     base_control.set_current_evcc_charging_state(evcc_interface.get_charging_state())
     base_control.set_current_evcc_charging_mode(evcc_interface.get_charging_mode())
+
+    # Publish MQTT after all states are set to reflect the final combined state
+    mqtt_interface.update_publish_topics(
+        {
+            "control/eos_ac_charge_demand": {
+                "value": base_control.get_needed_ac_charge_power()
+            },
+            "control/eos_dc_charge_demand": {
+                "value": base_control.get_current_dc_charge_demand()
+            },
+            "control/eos_discharge_allowed": {
+                "value": base_control.get_effective_discharge_allowed()
+            },
+        }
+    )
 
     last_control_data["current_soc"] = current_soc
     last_control_data["ac_charge_demand"] = ac_charge_demand_rel
@@ -866,8 +886,25 @@ class OptimizationScheduler:
         optimized_response, avg_runtime = eos_interface.optimize(
             json_optimize_input, config_manager.config["eos"]["timeout"]
         )
-        # Store the runtime for use in sleep calculation
-        self._last_avg_runtime = avg_runtime
+        # Store the runtime for use in sleep calculation (defensive against None)
+        try:
+            if avg_runtime is None:
+                # keep previous value or default if not present
+                self._last_avg_runtime = getattr(self, "_last_avg_runtime", 120)
+                logger.warning(
+                    "[Main] optimize() returned no avg_runtime; keeping previous value: %s",
+                    self._last_avg_runtime,
+                )
+            else:
+                self._last_avg_runtime = avg_runtime
+        except (TypeError, AttributeError) as e:
+            # fallback to a sensible default and log the specific error
+            logger.warning(
+                "[Main] Error processing avg_runtime (%s): %s. Falling back to default.",
+                type(avg_runtime).__name__ if "avg_runtime" in locals() else "Unknown",
+                e,
+            )
+            self._last_avg_runtime = 120
 
         json_optimize_input["timestamp"] = datetime.now(time_zone).isoformat()
         self.last_request_response["request"] = json.dumps(
@@ -1184,18 +1221,20 @@ def change_control_state():
     tgt_ac_charge_power = min(
         base_control.get_needed_ac_charge_power(),
         round(battery_interface.get_max_charge_power()),
+        config_manager.config["inverter"]["max_grid_charge_rate"],
     )
     tgt_dc_charge_power = min(
         base_control.get_current_dc_charge_demand(),
         round(battery_interface.get_max_charge_power()),
+        config_manager.config["inverter"]["max_pv_charge_rate"],
     )
 
     base_control.set_current_bat_charge_max(
         max(tgt_ac_charge_power, tgt_dc_charge_power)
     )
 
-    # Check if the overall state of the inverter was changed recently
-    if base_control.was_overall_state_changed_recently():
+    # Check if the overall state of the inverter was changed recently and consume the event
+    if base_control.was_overall_state_changed_recently(consume=True):
         logger.debug("[Main] Overall state changed recently")
         # MODE_CHARGE_FROM_GRID
         if current_overall_state == 0:
@@ -1455,7 +1494,8 @@ def get_controls():
     """
     current_ac_charge_demand = base_control.get_current_ac_charge_demand()
     current_dc_charge_demand = base_control.get_current_dc_charge_demand()
-    current_discharge_allowed = base_control.get_current_discharge_allowed()
+    # Use effective discharge allowed state (reflects final state after EVCC/manual overrides)
+    current_discharge_allowed = base_control.get_effective_discharge_allowed()
     current_battery_soc = battery_interface.get_current_soc()
     base_control.set_current_battery_soc(current_battery_soc)
     current_inverter_mode = base_control.get_current_overall_state()
@@ -1487,6 +1527,7 @@ def get_controls():
             "max_grid_charge_rate": config_manager.config["inverter"][
                 "max_grid_charge_rate"
             ],
+            "stored_energy": battery_interface.get_stored_energy_info(),
         },
         "inverter": {
             "inverter_special_data": (
