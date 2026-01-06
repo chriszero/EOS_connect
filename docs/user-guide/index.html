@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Guide - EOS Connect Documentation</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+</head>
+<body>
+    <!-- DRAFT BANNER - REMOVE WHEN FINALIZED -->
+    <div class="draft-banner">
+        <i class="fas fa-exclamation-triangle"></i> DRAFT DOCUMENTATION - UNDER REVIEW <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <!-- END DRAFT BANNER -->
+
+    <nav class="nav-header">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo"><img src="../assets/images/icon.png" alt="EOS Connect" style="height: 48px; vertical-align: middle; margin-right: 8px;">EOS Connect</a>
+            <ul class="nav-menu">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../what-is/index.html">What Is</a></li>
+                <li><a href="index.html" class="active">User Guide</a></li>
+                <li><a href="configuration.html">Configuration</a></li>
+                <li><a href="../advanced/index.html">Advanced</a></li>
+                <li><a href="../developer/index.html">Developer</a></li>
+                <li><a href="https://github.com/ohAnd/EOS_connect" target="_blank"><i class="fab fa-github"></i> GitHub</a></li>
+                <li><a href="https://github.com/sponsors/ohAnd" target="_blank" title="Sponsor the project"><i class="fas fa-mug-hot"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page wrapper with sidebar -->
+        <div class="page-wrapper">
+            <!-- Table of Contents Sidebar -->
+            <aside class="toc-sidebar">
+                <h3>On This Page</h3>
+                <nav class="toc-nav">
+                    <a href="#installation" class="toc-link">Quick Start</a>
+                    <a href="#configuration" class="toc-link">Configuration</a>
+                    <a href="#common-tasks" class="toc-link">Common Tasks</a>
+                    <a href="#eos-server-setup" class="toc-link">EOS/EVopt Setup</a>
+                </nav>
+            </aside>
+
+            <!-- Main content -->
+            <main class="main-content">
+        <div class="hero">
+            <h1>User Guide</h1>
+            <p>Install, configure, and use EOS Connect to bridge your energy system with optimization engines</p>
+        </div>
+
+        <!-- Quick Navigation -->
+        <div class="main-blocks">
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-download"></i></div>
+                    <h3>Installation</h3>
+                </div>
+                <p>Step-by-step guides for Home Assistant, Docker, and local installation</p>
+                <a href="#installation" class="btn">Install →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-cog"></i></div>
+                    <h3>Configuration</h3>
+                </div>
+                <p>Complete configuration reference for config.yaml</p>
+                <a href="configuration.html" class="btn">Configure →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-desktop"></i></div>
+                    <h3>Common Tasks</h3>
+                </div>
+                <p>Manual overrides, mode switching, and daily operations</p>
+                <a href="#common-tasks" class="btn">View Tasks →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-question-circle"></i></div>
+                    <h3>Support</h3>
+                </div>
+                <p>Troubleshooting EOS connection and getting help</p>
+                <a href="#eos-server-setup" class="btn">Get Help →</a>
+            </div>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="content-section" id="installation">
+            <h2><i class="fas fa-rocket"></i> Quick Start</h2>
+            <p>Get EOS Connect running in 4 simple steps:</p>
+
+            <h3>Step 1: Requirements</h3>
+            <ul>
+                <li><strong>Home Assistant</strong> (recommended for most users) OR</li>
+                <li><strong>Docker</strong> with Docker Compose OR</li>
+                <li><strong>Python 3.11+</strong> for local installation</li>
+                <li><strong>Running EOS Server:</strong> You must have an instance of <a href="https://github.com/Akkudoktor-EOS/EOS" target="_blank">Akkudoktor EOS</a> or <a href="https://github.com/thecem/hassio-evopt" target="_blank">EVopt</a> already running and reachable</li>
+            </ul>
+
+            <h3>Step 2: Install</h3>
+            
+            <h4>Option A: Home Assistant Add-on (Recommended)</h4>
+            <ol>
+                <li>Add repository: <a href="https://github.com/ohAnd/ha_addons" target="_blank">ohAnd/ha_addons</a></li>
+                <li>Install "EOS Server" add-on (or EVopt)</li>
+                <li>Install "EOS Connect" add-on</li>
+                <li>Configure both via HA UI</li>
+                <li>Start both add-ons</li>
+            </ol>
+
+            <h4>Option B: Docker</h4>
+            <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
+cd EOS_connect
+docker-compose up --pull always -d</code></pre>
+
+            <h4>Option C: Local Python</h4>
+            <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
+cd EOS_connect
+pip install -r requirements.txt
+python src/eos_connect.py</code></pre>
+
+            <h3>Step 3: Configure</h3>
+            <p>Edit <code>src/config.yaml</code> with your system details:</p>
+            <pre><code># Minimum configuration
+eos:
+  server: 192.168.1.94  # Your EOS server IP
+  port: 8503
+  time_frame: 900  # 15-minute intervals
+
+battery:
+  capacity_wh: 11059
+  max_charge_power_w: 5000
+
+pv_forecast:
+  - name: myPV
+    lat: 52.5200
+    lon: 13.4050
+    azimuth: 180
+    tilt: 25
+    power: 5000</code></pre>
+
+            <h3>Step 4: Access Web Dashboard</h3>
+            <p>Open your browser to:</p>
+            <ul>
+                <li><strong>Home Assistant:</strong> http://homeassistant.local:8081</li>
+                <li><strong>Docker/Local:</strong> http://localhost:8081</li>
+            </ul>
+
+            <div class="alert alert-success">
+                <strong><i class="fas fa-check-circle"></i> Success!</strong> You should see the EOS Connect dashboard with real-time data and forecasts.
+            </div>
+        </div>
+
+        <!-- Configuration Overview -->
+        <div class="content-section" id="configuration">
+            <h2><i class="fas fa-cog"></i> Configuration Overview</h2>
+            <p>EOS Connect uses a YAML configuration file (<code>config.yaml</code>) with the following main sections:</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        <th>Purpose</th>
+                        <th>Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>load</code></td>
+                        <td>Configure household load data source</td>
+                        <td>No (can use default)</td>
+                    </tr>
+                    <tr>
+                        <td><code>eos</code></td>
+                        <td>EOS/EVopt server connection</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>price</code></td>
+                        <td>Electricity price provider</td>
+                        <td>No (can use default)</td>
+                    </tr>
+                    <tr>
+                        <td><code>battery</code></td>
+                        <td>Battery specifications and SOC source</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>pv_forecast</code></td>
+                        <td>Solar forecast configuration</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><code>inverter</code></td>
+                        <td>Inverter control settings</td>
+                        <td>No (can use default)</td>
+                    </tr>
+                    <tr>
+                        <td><code>evcc</code></td>
+                        <td>EV charging controller integration</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><code>mqtt</code></td>
+                        <td>MQTT broker and Home Assistant settings</td>
+                        <td>No</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <a href="configuration.html" class="btn-primary">Full Configuration Reference →</a>
+        </div>
+
+        <!-- Common Tasks -->
+        <div class="content-section" id="common-tasks">
+            <h2><i class="fas fa-edit"></i> Common Tasks</h2>
+            <p>For a detailed breakdown of the dashboard interface, see the <a href="../what-is/index.html#web-dashboard">Dashboard Overview</a>.</p>
+
+            <h3>Force Battery Charging from Grid</h3>
+            <ol>
+                <li>Open web dashboard</li>
+                <li>Select "ChargeFromGrid" mode</li>
+                <li>Set desired charge power (e.g., 3000 W)</li>
+                <li>Set override duration (e.g., 02:00 for 2 hours)</li>
+                <li>System will automatically return to Auto mode after duration</li>
+            </ol>
+
+            <h3>Switch to PV-Only Charging</h3>
+            <ol>
+                <li>Select "PVOnly" mode</li>
+                <li>Battery will only charge from solar surplus</li>
+                <li>Grid charging will be disabled</li>
+            </ol>
+
+            <h3>View Optimization Schedule</h3>
+            <ol>
+                <li>Check "Last Optimization" timestamp in dashboard</li>
+                <li>View "Next Optimization" countdown</li>
+                <li>Charts show planned battery SOC curve</li>
+            </ol>
+
+            <h3>Monitor Battery Price</h3>
+            <ol>
+                <li>Enable <code>battery.price_calculation_enabled: true</code></li>
+                <li>Configure required sensors (battery_power, pv_power, grid_power, price)</li>
+                <li>View calculated price in dashboard</li>
+                <li>Historical sessions shown with costs</li>
+            </ol>
+        </div>
+
+        <!-- EOS Server Setup -->
+        <div class="content-section" id="eos-server-setup">
+            <h2><i class="fas fa-desktop"></i> EOS/EVopt Server Setup</h2>
+            <p><strong>EOS Connect requires a running optimization backend to calculate energy strategies.</strong></p>
+            
+            <div class="alert alert-info">
+                <strong><i class="fas fa-lightbulb"></i> Remember:</strong> EOS Connect is an <strong>integration and control platform</strong>. The optimization calculations are performed by:
+                <ul style="margin-top: 0.5rem;">
+                    <li><strong>EOS</strong> - Akkudoktor Energy Optimization System (port 8503)</li>
+                    <li><strong>EVopt</strong> - Lightweight optimizer (port 7050)</li>
+                </ul>
+            </div>
+
+            <h3>Installing the Optimization Backend</h3>
+
+            <h4>Option 1: Home Assistant Add-on</h4>
+            <p>Install via Home Assistant add-on store:</p>
+            <ul>
+                <li><strong>EOS:</strong> <a href="https://github.com/Duetting/ha_eos_addon" target="_blank">Duetting/ha_eos_addon</a> or <a href="https://github.com/thecem/ha_eos_addon" target="_blank">thecem/ha_eos_addon</a></li>
+                <li><strong>EVopt:</strong> <a href="https://github.com/thecem/hassio-evopt" target="_blank"><i class="fab fa-github"></i> thecem/hassio-evopt</a></li>
+            </ul>
+
+            <h4>Option 2: Docker</h4>
+            <p>Run EOS in a separate Docker container (see EOS repository for docker-compose configuration).</p>
+
+            <h4>Option 3: Local Installation</h4>
+            <p>Clone and run EOS locally (requires Python). See <a href="https://github.com/Akkudoktor-EOS/EOS" target="_blank">EOS documentation</a>.</p>
+
+            <h3>EOS Server Configuration</h3>
+            <div class="alert alert-warning">
+                <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong> EOS must be configured for <strong>prediction mode</strong> with proper settings.
+            </div>
+
+            <h4>Required EOS Prediction Settings</h4>
+            <p>In your EOS configuration, ensure these are set:</p>
+            <pre><code>prediction_hours: 48
+pv_prognose_today: 0.0
+pv_prognose_tomorrow: 0.0
+eauto: 0
+gesamtlast: 0.0</code></pre>
+
+            <h4>What EOS Connect Provides</h4>
+            <p>EOS Connect automatically sends these values in optimization requests:</p>
+            <ul>
+                <li>PV forecasts (from your configured provider)</li>
+                <li>Load predictions (from historical data or default profile)</li>
+                <li>Current battery SOC</li>
+                <li>Electricity price forecasts</li>
+                <li>EVCC requirements (if configured)</li>
+            </ul>
+
+            <h3>Troubleshooting EOS Connection</h3>
+            <ul>
+                <li><strong>Connection refused:</strong> Check EOS server is running on configured port</li>
+                <li><strong>Timeout:</strong> Increase <code>eos.timeout</code> in config (default 180s)</li>
+                <li><strong>Wrong results:</strong> Verify EOS is in prediction mode, not using test data</li>
+            </ul>
+
+            <a href="#common-tasks" class="btn-primary">Common Tasks →</a>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="content-section">
+            <h2><i class="fas fa-arrow-right"></i> Next Steps</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <a href="configuration.html" class="btn-primary">Full Configuration →</a>
+                    <p>Detailed configuration for all features</p>
+                </div>
+                <div class="feature-item">
+                    <a href="../advanced/index.html" class="btn-primary">Advanced Features →</a>
+                    <p>MQTT, REST API, and automation</p>
+                </div>
+                <div class="feature-item">
+                    <a href="#common-tasks" class="btn-primary">Common Tasks →</a>
+                    <p>Learn how to perform manual actions</p>
+                </div>
+            </div>
+        </div>
+            </main>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>EOS Connect Documentation | <a href="../index.html">Home</a> | <a href="https://github.com/ohAnd/EOS_connect">GitHub</a> | <a href="https://github.com/sponsors/ohAnd">Sponsor</a></p>
+    </footer>
+
+    <!-- Scroll spy for TOC -->
+    <script>
+        const sections = document.querySelectorAll('.content-section[id]');
+        const tocLinks = document.querySelectorAll('.toc-link');
+
+        function highlightTOC() {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', highlightTOC);
+        highlightTOC();
+    </script>
+</body>
+</html>

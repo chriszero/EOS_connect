@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration Reference - EOS Connect</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+</head>
+<body>
+    <!-- DRAFT BANNER - REMOVE WHEN FINALIZED -->
+    <div class="draft-banner">
+        <i class="fas fa-exclamation-triangle"></i> DRAFT DOCUMENTATION - UNDER REVIEW <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <!-- END DRAFT BANNER -->
+
+    <!-- Navigation -->
+    <nav class="nav-header">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo"><img src="../assets/images/icon.png" alt="EOS Connect" style="height: 48px; vertical-align: middle; margin-right: 8px;">EOS Connect</a>
+            <ul class="nav-menu">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../what-is/index.html">What Is</a></li>
+                <li><a href="index.html">User Guide</a></li>
+                <li><a href="configuration.html" class="active">Configuration</a></li>
+                <li><a href="../advanced/index.html">Advanced</a></li>
+                <li><a href="../developer/index.html">Developer</a></li>
+                <li><a href="https://github.com/ohAnd/EOS_connect" target="_blank"><i class="fab fa-github"></i> GitHub</a></li>
+                <li><a href="https://github.com/sponsors/ohAnd" target="_blank" title="Sponsor the project"><i class="fas fa-mug-hot"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-wrapper">
+            <aside class="toc-sidebar">
+                <h3>On This Page</h3>
+                <nav class="toc-nav">
+                    <a href="#load" class="toc-link">Load</a>
+                    <a href="#eos" class="toc-link">EOS Server</a>
+                    <a href="#price" class="toc-link">Electricity Prices</a>
+                    <a href="#battery" class="toc-link">Battery</a>
+                    <a href="#pv" class="toc-link">PV Forecasts</a>
+                    <a href="#inverter" class="toc-link">Inverter</a>
+                    <a href="#evcc" class="toc-link">EVCC</a>
+                    <a href="#mqtt" class="toc-link">MQTT</a>
+                    <a href="#other" class="toc-link">Other Settings</a>
+                </nav>
+            </aside>
+
+            <main class="main-content">
+        <div class="hero">
+            <h1>Configuration Reference</h1>
+            <p>Complete guide to all config.yaml parameters with explanations and practical examples</p>
+        </div>
+
+        <!-- Table of Contents -->
+        <div class="content-section">
+            <h2><i class="fas fa-list"></i> Quick Navigation</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <a href="#load"><i class="fas fa-plug"></i> Load Configuration</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#eos"><i class="fas fa-server"></i> EOS Server</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#price"><i class="fas fa-dollar-sign"></i> Electricity Prices</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#battery"><i class="fas fa-battery-full"></i> Battery</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#pv"><i class="fas fa-sun"></i> PV Forecasts</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#inverter"><i class="fas fa-solar-panel"></i> Inverter</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#evcc"><i class="fas fa-car"></i> EVCC</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#mqtt"><i class="fas fa-network-wired"></i> MQTT</a>
+                </div>
+                <div class="feature-item">
+                    <a href="#other"><i class="fas fa-cog"></i> Other Settings</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load Configuration -->
+        <div class="content-section" id="load">
+            <h2><i class="fas fa-plug"></i> Load Configuration</h2>
+            <p>Configure how EOS Connect reads your household power consumption data.</p>
+
+            <h3>load.source</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.source</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Data source for load power consumption</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td><code>homeassistant</code>, <code>openhab</code>, <code>default</code></td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>default</code> (uses static consumption profile)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>source: homeassistant</code></td>
+                </tr>
+            </table>
+
+            <h3>load.url</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.url</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>URL to your Home Assistant or OpenHAB instance</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td><code>http://&lt;hostname_or_ip&gt;:&lt;port&gt;</code></td>
+                </tr>
+                <tr>
+                    <th>Examples</th>
+                    <td>
+                        <code>http://homeassistant:8123</code><br>
+                        <code>http://192.168.1.100:8080</code>
+                    </td>
+                </tr>
+            </table>
+
+            <h3>load.access_token</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.access_token</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Long-lived access token for Home Assistant</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes for Home Assistant, optional for OpenHAB</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>In Home Assistant: Profile → Long-Lived Access Tokens → Create Token<br>Leave empty if not needed: <code>access_token:</code></td>
+                </tr>
+            </table>
+
+            <h3>load.load_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.load_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Entity/item name for total household power consumption</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Examples</th>
+                    <td>
+                        <code>sensor.house_power</code> (Home Assistant)<br>
+                        <code>PowerMeter_Load</code> (OpenHAB)
+                    </td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Represents overall net household load (total house consumption). Positive (consumption) or negative (feed-in) values are converted to absolute positive internally.</td>
+                </tr>
+            </table>
+
+            <h3>load.car_charge_load_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.car_charge_load_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Entity/item for EV charger power consumption (optional)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>sensor.wallbox_power</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Separates controllable EV charging from base household load for more accurate optimization. This load is <strong>subtracted</strong> from the main load sensor value. Leave empty if not needed: <code>car_charge_load_sensor:</code></td>
+                </tr>
+            </table>
+
+            <h3>load.additional_load_1_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.additional_load_1_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Entity/item for additional controllable load (e.g., heat pump, dishwasher)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>sensor.heatpump_power</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Separates additional controllable devices from base household load. This load is <strong>subtracted</strong> from the main load sensor value. Leave empty if not needed: <code>additional_load_1_sensor:</code></td>
+                </tr>
+            </table>
+
+            <h3>load.additional_load_1_runtime</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.additional_load_1_runtime</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Expected runtime of additional load</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Minutes</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>0</code> (not used)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>120</code> (2 hours)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Helps optimization engine plan when to run the additional load</td>
+                </tr>
+            </table>
+
+            <h3>load.additional_load_1_consumption</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>load.additional_load_1_consumption</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Energy consumption of additional load for ONE hour</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watt-hours (Wh)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>0</code> (not used)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>2000</code> (2 kWh per hour)</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- EOS Server Configuration -->
+        <div class="content-section" id="eos">
+            <h2><i class="fas fa-server"></i> EOS Server Configuration</h2>
+            <p>Configure the connection to your external optimization backend (Akkudoktor EOS or EVopt).</p>
+
+            <h3>eos.source</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos.source</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Which optimization backend to use</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td><code>eos_server</code>, <code>evopt</code></td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>eos_server</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        <strong>eos_server</strong>: Full-featured Akkudoktor EOS (<a href="https://github.com/Akkudoktor-EOS/EOS" target="_blank">GitHub</a>)<br>
+                        <strong>evopt</strong>: Lightweight, faster alternative (<a href="https://github.com/thecem/hassio-evopt" target="_blank">GitHub</a>)
+                    </td>
+                </tr>
+            </table>
+
+            <h3>eos.server</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos.server</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Hostname or IP address of your EOS/EVopt server</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <th>Examples</th>
+                    <td>
+                        <code>homeassistant</code><br>
+                        <code>192.168.1.50</code><br>
+                        <code>eos.local</code>
+                    </td>
+                </tr>
+            </table>
+
+            <h3>eos.port</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos.port</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Port number of your optimization server</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>8503</code> for eos_server<br>
+                        <code>7050</code> for evopt
+                    </td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes</td>
+                </tr>
+            </table>
+
+            <h3>eos.time_frame</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos.time_frame</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Granularity of optimization time steps</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Seconds</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>3600</code> - Hourly optimization (legacy)<br>
+                        <code>900</code> - 15-minute optimization (recommended)
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>3600</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Smaller values = more detailed optimization but higher computational load</td>
+                </tr>
+            </table>
+
+            <h3>eos.timeout</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos.timeout</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Maximum time to wait for optimization response</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Seconds</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>180</code></td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>120-180</code> for normal operation</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Increase if optimization takes longer or server is slow</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Price Configuration -->
+        <div class="content-section" id="price">
+            <h2><i class="fas fa-dollar-sign"></i> Electricity Price Configuration</h2>
+            <p>Configure dynamic electricity pricing for cost optimization.</p>
+            
+            <div class="alert alert-warning">
+                <strong><i class="fas fa-exclamation-triangle"></i> Important:</strong> All price values must use the same base - either all prices include taxes and fees, or all prices exclude taxes and fees. Mixing different bases will lead to incorrect optimization results.
+            </div>
+
+            <h3>price.source</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.source</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Provider for dynamic electricity prices</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>tibber</code> - Tibber API<br>
+                        <code>smartenergy_at</code> - Austrian provider<br>
+                        <code>stromligning</code> - Danish provider<br>
+                        <code>fixed_24h</code> - Custom 24-hour array<br>
+                        <code>default</code> - Akkudoktor API
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>default</code></td>
+                </tr>
+            </table>
+
+            <h3>price.token</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.token</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>API token or configuration string for price provider</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <strong>Tibber:</strong> Your API token from <a href="https://developer.tibber.com" target="_blank">developer.tibber.com</a><br>
+                        <strong>Strømligning:</strong> <code>supplierId/productId[/customerGroupId]</code>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>radius_c/velkommen_gron_el/c</code> (Strømligning)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Leave empty if not needed: <code>token:</code></td>
+                </tr>
+            </table>
+
+            <h3>price.fixed_price_adder_ct</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.fixed_price_adder_ct</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Fixed cost addition per kWh (e.g., grid fees, taxes)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Cents per kWh (ct/kWh)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>8.5</code> (adds 8.5 ct/kWh)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Only use with <code>source: default</code> to add fixed costs to Akkudoktor prices</td>
+                </tr>
+            </table>
+
+            <h3>price.relative_price_multiplier</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.relative_price_multiplier</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Percentage markup applied to (base price + fixed_price_adder_ct)</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Decimal (e.g., <code>0.05</code> for 5%)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0.19</code> (adds 19% VAT)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Only use with <code>source: default</code> for percentage-based fees</td>
+                </tr>
+            </table>
+
+            <h3>price.fixed_24h_array</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.fixed_24h_array</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>24-hour array of fixed prices for each hour of the day</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Cents per kWh (ct/kWh)</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Comma-separated list of 24 values (no brackets)<br>
+                        Hour 0 (00:00-01:00), Hour 1 (01:00-02:00), ..., Hour 23 (23:00-24:00)
+                    </td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td style="word-break: break-all;">
+                        <code>10.5,10.5,10.5,10.5,10.5,23.0,<br>
+                        28.2,28.2,28.2,28.2,28.2,23.5,<br>
+                        23.5,23.5,23.5,28.2,28.2,34.3,<br>
+                        34.3,34.3,34.3,34.3,28.0,23.0</code>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Only use when <code>source: fixed_24h</code></td>
+                </tr>
+            </table>
+
+            <h3>price.feed_in_price</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.feed_in_price</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Compensation you receive for feeding energy back to the grid</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Euro per kWh (€/kWh)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0.08</code> (8 cents per kWh)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Must use the same tax/fee basis as your purchase prices. Typical range: 0.05 - 0.12 €/kWh</td>
+                </tr>
+            </table>
+
+            <h3>price.negative_price_switch</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>price.negative_price_switch</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>How to handle negative electricity market prices</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Limit feed-in price to €0 when market price is negative<br>
+                        <code>false</code> - Always use the configured feed_in_price
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>false</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Use <code>true</code> if your feed-in tariff pays €0 during negative market prices</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Continue with Battery, PV, Inverter, EVCC, MQTT, Other sections... -->
+        <!-- Due to length, I'll create a placeholder for now -->
+
+        <div class="content-section" id="battery">
+            <h2><i class="fas fa-battery-full"></i> Battery Configuration</h2>
+            <p>Configure your battery system for state-of-charge monitoring and optimization.</p>
+
+            <h3>battery.source</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.source</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Data source for battery SOC (State of Charge)</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>openhab</code> - OpenHAB integration<br>
+                        <code>homeassistant</code> - Home Assistant integration<br>
+                        <code>default</code> - Static data
+                    </td>
+                </tr>
+            </table>
+
+            <h3>battery.url</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.url</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>URL for OpenHAB or Home Assistant server</td>
+                </tr>
+                <tr>
+                    <th>Examples</th>
+                    <td>
+                        <code>http://192.168.1.50:8080</code> (OpenHAB)<br>
+                        <code>http://homeassistant:8123</code> (Home Assistant)
+                    </td>
+                </tr>
+            </table>
+
+            <h3>battery.soc_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.soc_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Item/entity name for the SOC sensor</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        OpenHAB: Decimal (0-1), percentage (0-100), or UoM ('0 %' - '100 %')<br>
+                        Home Assistant: Entity ID (e.g., <code>sensor.battery_soc</code>)
+                    </td>
+                </tr>
+            </table>
+
+            <h3>battery.access_token</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.access_token</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Access token for Home Assistant authentication</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Required for Home Assistant. Independent from load configuration token. Leave empty if not needed: <code>access_token:</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.capacity_wh</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.capacity_wh</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Total capacity of the battery</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watt-hours (Wh)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>11059</code> (11.059 kWh)</td>
+                </tr>
+            </table>
+
+            <h3>battery.charge_efficiency</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.charge_efficiency</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Efficiency of charging the battery</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Decimal between 0 and 1</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0.88</code> (88% efficient)</td>
+                </tr>
+            </table>
+
+            <h3>battery.discharge_efficiency</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.discharge_efficiency</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Efficiency of discharging the battery</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Decimal between 0 and 1</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0.88</code> (88% efficient)</td>
+                </tr>
+            </table>
+
+            <h3>battery.max_charge_power_w</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.max_charge_power_w</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Maximum charging power for the battery</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>5000</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.min_soc_percentage</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.min_soc_percentage</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Minimum state of charge for the battery</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Percentage (%)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>5</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.max_soc_percentage</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.max_soc_percentage</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Maximum state of charge for the battery</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Percentage (%)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>100</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.charging_curve_enabled</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.charging_curve_enabled</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Enable dynamic charging curve for battery protection</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Enable dynamic curve (SOC + temperature based)<br>
+                        <code>false</code> - Always charge at max power
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>true</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        <strong>SOC-based reduction:</strong> At SOC ≤50%, full power. Above 50%, exponentially reduced to ~5% at 95% SOC.<br>
+                        <strong>Temperature protection:</strong> If <code>sensor_battery_temperature</code> configured:<br>
+                        • Below 0°C: 5-7.5% power (prevents lithium plating)<br>
+                        • 0-5°C: 5-15% power (gradual warm-up)<br>
+                        • 15-45°C: 100% power (optimal range)<br>
+                        • 45-50°C: 45-100% power (heat warning)<br>
+                        • Above 50°C: 7.5-45% power (critical protection)
+                    </td>
+                </tr>
+            </table>
+
+            <h3>battery.sensor_battery_temperature</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.sensor_battery_temperature</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor/item identifier for battery temperature</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Celsius (°C)</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Temperature range: -30°C to 70°C</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>""</code> (disabled)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>sensor.byd_battery_box_premium_hv_temperatur</code> (BYD Battery Box)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Highly recommended for battery protection. Enables automatic temperature-based charging power reduction. If not configured, only SOC-based curve is used.</td>
+                </tr>
+            </table>
+
+            <h3>battery.price_euro_per_wh_accu</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_euro_per_wh_accu</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Static price for battery energy storage</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Euro per Wh (€/Wh)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>0</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Can be used to shift optimization results based on available energy</td>
+                </tr>
+            </table>
+
+            <h3>battery.price_euro_per_wh_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_euro_per_wh_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor/item that exposes battery price dynamically</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Euro per Wh (€/Wh)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>sensor.battery_price</code> (Home Assistant)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>If configured, overrides static <code>price_euro_per_wh_accu</code> value. Leave empty to use static price.</td>
+                </tr>
+            </table>
+
+            <div class="alert alert-info">
+                <h4><i class="fas fa-calculator"></i> Dynamic Battery Price Calculation</h4>
+                <p>EOS Connect can automatically calculate the real cost of energy in your battery by analyzing historical charging events:</p>
+            </div>
+
+            <h3>battery.price_calculation_enabled</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_calculation_enabled</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Enable dynamic battery price calculation from historical data</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Analyze charging history to determine real energy cost<br>
+                        <code>false</code> - Use static price or sensor value
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>false</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        Uses LIFO (Last-In, First-Out) inventory model. Analyzes charging events to determine if energy came from PV surplus (at feed-in price) or grid (at market price). Provides accurate representation of energy value currently stored in battery.
+                    </td>
+                </tr>
+            </table>
+
+            <h3>battery.price_update_interval</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_update_interval</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Interval between dynamic price recalculations</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Seconds</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>900</code> (15 minutes)</td>
+                </tr>
+            </table>
+
+            <h3>battery.price_history_lookback_hours</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_history_lookback_hours</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Number of hours to analyze for price calculation</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Hours</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>96</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.battery_power_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.battery_power_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor for battery power (required for dynamic price calculation)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W) - positive values must represent charging</td>
+                </tr>
+            </table>
+
+            <h3>battery.pv_power_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.pv_power_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor for total PV power (required for dynamic price calculation)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+            </table>
+
+            <h3>battery.grid_power_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.grid_power_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor for grid power (required for dynamic price calculation)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W) - positive values represent import from grid</td>
+                </tr>
+            </table>
+
+            <h3>battery.load_power_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.load_power_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor for household load power (required for dynamic price calculation)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+            </table>
+
+            <h3>battery.price_sensor</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.price_sensor</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Sensor for current electricity price (required for dynamic price calculation)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Euro per kWh (€/kWh) or cents per kWh (ct/kWh)</td>
+                </tr>
+            </table>
+
+            <h3>battery.charging_threshold_w</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.charging_threshold_w</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Minimum battery power to consider as "charging" during analysis</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>50.0</code></td>
+                </tr>
+            </table>
+
+            <h3>battery.grid_charge_threshold_w</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>battery.grid_charge_threshold_w</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Minimum grid import power to attribute charging to grid vs PV surplus</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>100.0</code></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content-section" id="pv">
+            <h2><i class="fas fa-sun"></i> PV Forecast Configuration</h2>
+            <p>Configure solar generation forecasts from various providers.</p>
+
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Note:</strong> Temperature forecasts are always retrieved from Akkudoktor API, so <code>lat</code> and <code>lon</code> are mandatory for all installations regardless of PV forecast source.
+            </div>
+
+            <h3>pv_forecast_source.source</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>pv_forecast_source.source</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Provider for solar generation forecasts</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>akkudoktor</code> - Akkudoktor API<br>
+                        <code>openmeteo</code> - Open-Meteo<br>
+                        <code>openmeteo_local</code> - Open-Meteo with local shading<br>
+                        <code>forecast_solar</code> - Forecast.Solar<br>
+                        <code>evcc</code> - EVCC integration<br>
+                        <code>solcast</code> - Solcast<br>
+                        <code>default</code> - Uses akkudoktor
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>akkudoktor</code></td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast_source.api_key</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>pv_forecast_source.api_key</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>API key for Solcast</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes, when source is <code>solcast</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Obtain from <a href="https://solcast.com/" target="_blank">solcast.com</a>. Leave empty for other sources: <code>api_key:</code></td>
+                </tr>
+            </table>
+
+            <div class="alert alert-warning">
+                <strong><i class="fas fa-exclamation-triangle"></i> Solcast Rate Limits:</strong> Free accounts are limited to 10 API calls per day. EOS Connect automatically extends update intervals to 2.5 hours when using Solcast (9.6 calls/day).
+            </div>
+
+            <h4>PV Installation Parameters</h4>
+            <p>Configure one or more PV installations in the <code>pv_forecast</code> array:</p>
+
+            <h3>pv_forecast[].name</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>name</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>User-defined identifier for the PV installation</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>Garden</code>, <code>Main Roof South</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Must be unique if using multiple installations</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].lat</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>lat</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Latitude of PV installation</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources - needed for temperature forecasts)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>52.5200</code></td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].lon</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>lon</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Longitude of PV installation</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources - needed for temperature forecasts)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>13.4050</code></td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].azimuth</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>azimuth</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Azimuth angle (0=North, 90=East, 180=South, 270=West)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Degrees</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources except <code>solcast</code>, <code>evcc</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>180</code> (South-facing)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>For <code>evcc</code>/<code>solcast</code>, configured in their platforms, set to <code>180</code> in HA addon</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].tilt</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>tilt</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Tilt angle (0=horizontal, 90=vertical)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Degrees</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources except <code>solcast</code>, <code>evcc</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>30</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>For <code>evcc</code>/<code>solcast</code>, configured in their platforms, set to <code>25</code> in HA addon</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].power</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>power</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>PV installation power (peak Wp)</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources except <code>evcc</code>, <code>solcast</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>4600</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>For <code>evcc</code>/<code>solcast</code>, still needed for system scaling, set to <code>1000</code> in HA addon</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].powerInverter</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>powerInverter</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Inverter power capacity</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources except <code>evcc</code>, <code>forecast_solar</code>, <code>solcast</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>5000</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Set to <code>1000</code> in HA addon if not needed</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].inverterEfficiency</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverterEfficiency</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Inverter efficiency</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Decimal between 0 and 1</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (all sources except <code>evcc</code>, <code>forecast_solar</code>, <code>solcast</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0.95</code> (95% efficient)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>For <code>evcc</code>/<code>forecast_solar</code>/<code>solcast</code>, set to <code>1</code> in HA addon</td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].horizon</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>horizon</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Shading situation for PV installation</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>Comma-separated values or list describing horizon elevation</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (for <code>openmeteo_local</code>, <code>forecast_solar</code>)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>[0]*36</code> for openmeteo_local, <code>[0]*24</code> for forecast_solar</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>0,0,0,0,0,0,0,0,50,70,0,0,0,0,0,0,0,0</code></td>
+                </tr>
+            </table>
+
+            <h3>pv_forecast[].resource_id</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>resource_id</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Solcast rooftop site identifier</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (when source is <code>solcast</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>abcd-efgh-1234-5678</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Obtained from Solcast dashboard after configuring rooftop site</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content-section" id="inverter">
+            <h2><i class="fas fa-solar-panel"></i> Inverter Configuration</h2>
+            <p>Configure inverter control for automated battery management.</p>
+
+            <h3>inverter.type</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.type</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Type of inverter for automated control</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>fronius_gen24</code> - Fronius Gen24 (enhanced V2 interface, firmware-based auth)<br>
+                        <code>fronius_gen24_legacy</code> - Fronius Gen24 (legacy V1 interface)<br>
+                        <code>evcc</code> - Universal via EVCC external battery control<br>
+                        <code>default</code> - Disable control (display only)
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>default</code></td>
+                </tr>
+            </table>
+
+            <h3>inverter.address</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.address</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>IP address of the inverter</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (for <code>fronius_gen24</code>, <code>fronius_gen24_legacy</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>192.168.1.12</code></td>
+                </tr>
+            </table>
+
+            <h3>inverter.user</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.user</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Username for inverter's local portal</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (for <code>fronius_gen24</code>, <code>fronius_gen24_legacy</code>)</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>customer</code></td>
+                </tr>
+            </table>
+
+            <h3>inverter.password</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.password</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Password for inverter's local portal</td>
+                </tr>
+                <tr>
+                    <th>Required</th>
+                    <td>Yes (for <code>fronius_gen24</code>, <code>fronius_gen24_legacy</code>)</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        <strong>Fronius Gen24 enhanced interface:</strong> Automatically detects firmware version and uses appropriate auth method. If you updated firmware to 1.38.6-1+ or newer, you may need to reset password in WebUI (http://your-inverter-ip/) under Settings → User Management.
+                    </td>
+                </tr>
+            </table>
+
+            <h3>inverter.max_grid_charge_rate</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.max_grid_charge_rate</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Maximum grid charge rate</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>5000</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Limitation for calculating target grid charge power and for EOS inverter model. Currently not supported by EVCC external battery control, but shown and calculated (reachable per EOS Connect API)</td>
+                </tr>
+            </table>
+
+            <h3>inverter.max_pv_charge_rate</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>inverter.max_pv_charge_rate</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Maximum PV charge rate</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Watts (W)</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>5000</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Limitation for calculating target PV charge power and for EOS inverter model. Currently not supported by EVCC external battery control, but shown and calculated (reachable per EOS Connect API)</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content-section" id="evcc">
+            <h2><i class="fas fa-car"></i> EVCC Configuration</h2>
+            <p>Configure integration with EVCC for EV charging management and PV forecast retrieval.</p>
+
+            <h3>evcc.url</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>evcc.url</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>URL for the EVCC instance</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>http://192.168.1.100:7070</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        Leave empty if not used: <code>url:</code> or <code>url: ""</code><br><br>
+                        <strong>Important:</strong> When using <code>evcc</code> as the <code>pv_forecast_source</code>, this EVCC configuration must be properly configured. EOS Connect will retrieve PV forecasts directly from the EVCC API instead of using individual PV installation configurations. In this case, the <code>pv_forecast</code> section requires at least one entry with valid <code>lat</code> and <code>lon</code> coordinates for temperature forecasts.
+                    </td>
+                </tr>
+            </table>
+
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> EVCC as Inverter Controller:</strong> When <code>inverter.type</code> is set to <code>evcc</code>, EOS Connect uses EVCC's external battery control feature to manage battery charging. This provides a universal interface that works with many inverter types supported by EVCC.
+            </div>
+        </div>
+
+        <div class="content-section" id="mqtt">
+            <h2><i class="fas fa-network-wired"></i> MQTT Configuration</h2>
+            <p>Configure MQTT broker connection and Home Assistant Auto Discovery.</p>
+
+            <h3>mqtt.enabled</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.enabled</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Enable or disable MQTT functionality</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Enable MQTT<br>
+                        <code>false</code> - Disable MQTT
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>false</code></td>
+                </tr>
+            </table>
+
+            <h3>mqtt.broker</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.broker</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Address of the MQTT broker</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>localhost</code>, <code>192.168.1.10</code></td>
+                </tr>
+            </table>
+
+            <h3>mqtt.port</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.port</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Port of the MQTT broker</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>1883</code></td>
+                </tr>
+            </table>
+
+            <h3>mqtt.user</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.user</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Username for MQTT broker authentication</td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>mqtt_user</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Optional - leave empty if broker doesn't require authentication</td>
+                </tr>
+            </table>
+
+            <h3>mqtt.password</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.password</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Password for MQTT broker authentication</td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Optional - leave empty if broker doesn't require authentication</td>
+                </tr>
+            </table>
+
+            <h3>mqtt.tls</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.tls</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Enable or disable TLS for secure MQTT connections</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Use TLS for secure connections<br>
+                        <code>false</code> - Do not use TLS
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>false</code></td>
+                </tr>
+            </table>
+
+            <h3>mqtt.ha_mqtt_auto_discovery</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.ha_mqtt_auto_discovery</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Enable or disable Home Assistant MQTT Auto Discovery</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>true</code> - Enable Auto Discovery<br>
+                        <code>false</code> - Disable Auto Discovery
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>true</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>When enabled, EOS Connect automatically publishes device and entity configurations to Home Assistant</td>
+                </tr>
+            </table>
+
+            <h3>mqtt.ha_mqtt_auto_discovery_prefix</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>mqtt.ha_mqtt_auto_discovery_prefix</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Prefix for Home Assistant MQTT Auto Discovery topics</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>homeassistant</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Only change if you've customized Home Assistant's discovery prefix</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content-section" id="other">
+            <h2><i class="fas fa-cog"></i> Other Configuration Settings</h2>
+            <p>General application settings and behavior.</p>
+
+            <h3>refresh_time</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>refresh_time</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>How often EOS Connect sends optimization requests to EOS server</td>
+                </tr>
+                <tr>
+                    <th>Unit</th>
+                    <td>Minutes</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>3</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>
+                        Controls update frequency. Works together with <code>eos.time_frame</code>:<br>
+                        • <code>refresh_time</code> = how often to request optimization<br>
+                        • <code>time_frame</code> = granularity of each optimization (900s=15min, 3600s=hourly)
+                    </td>
+                </tr>
+            </table>
+
+            <h3>time_zone</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>time_zone</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Time zone for the application</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>Europe/Berlin</code></td>
+                </tr>
+                <tr>
+                    <th>Example</th>
+                    <td><code>America/New_York</code>, <code>Asia/Tokyo</code></td>
+                </tr>
+            </table>
+
+            <h3>eos_connect_web_port</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>eos_connect_web_port</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Port for EOS Connect web server and API</td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>8081</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Access web dashboard at <code>http://your-server:8081</code></td>
+                </tr>
+            </table>
+
+            <h3>log_level</h3>
+            <table>
+                <tr>
+                    <th>Parameter</th>
+                    <td><code>log_level</code></td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>Logging verbosity level</td>
+                </tr>
+                <tr>
+                    <th>Valid Values</th>
+                    <td>
+                        <code>debug</code> - Detailed debugging information<br>
+                        <code>info</code> - General informational messages<br>
+                        <code>warning</code> - Warning messages only<br>
+                        <code>error</code> - Error messages only
+                    </td>
+                </tr>
+                <tr>
+                    <th>Default</th>
+                    <td><code>info</code></td>
+                </tr>
+                <tr>
+                    <th>Notes</th>
+                    <td>Use <code>debug</code> for troubleshooting, <code>info</code> for normal operation</td>
+                </tr>
+            </table>
+
+            <div class="alert alert-info">
+                <strong><i class="fas fa-file-alt"></i> Configuration File:</strong> The <code>config.yaml</code> file must be located in the <code>src</code> directory. If it doesn't exist, EOS Connect will create one with default values on first startup and prompt you to configure it before restarting.
+            </div>
+        </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>EOS Connect Documentation | <a href="../index.html">Home</a> | <a href="https://github.com/ohAnd/EOS_connect">GitHub</a> | <a href="https://github.com/sponsors/ohAnd">Sponsor</a></p>
+    </footer>
+
+    <!-- Scroll spy for TOC -->
+    <script>
+        const sections = document.querySelectorAll('.content-section[id]');
+        const tocLinks = document.querySelectorAll('.toc-link');
+
+        function highlightTOC() {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', highlightTOC);
+        highlightTOC();
+    </script>
+</body>
+</html>

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Features - EOS Connect Documentation</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+</head>
+<body>
+    <!-- DRAFT BANNER - REMOVE WHEN FINALIZED -->
+    <div class="draft-banner">
+        <i class="fas fa-exclamation-triangle"></i> DRAFT DOCUMENTATION - UNDER REVIEW <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <!-- END DRAFT BANNER -->
+
+    <nav class="nav-header">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo"><img src="../assets/images/icon.png" alt="EOS Connect" style="height: 48px; vertical-align: middle; margin-right: 8px;">EOS Connect</a>
+            <ul class="nav-menu">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../what-is/index.html">What Is</a></li>
+                <li><a href="../user-guide/index.html">User Guide</a></li>
+                <li><a href="../user-guide/configuration.html">Configuration</a></li>
+                <li><a href="index.html" class="active">Advanced</a></li>
+                <li><a href="../developer/index.html">Developer</a></li>
+                <li><a href="https://github.com/ohAnd/EOS_connect" target="_blank"><i class="fab fa-github"></i> GitHub</a></li>
+                <li><a href="https://github.com/sponsors/ohAnd" target="_blank" title="Sponsor the project"><i class="fas fa-mug-hot"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-wrapper">
+            <aside class="toc-sidebar">
+                <h3>On This Page</h3>
+                <nav class="toc-nav">
+                    <a href="#rest-api" class="toc-link">REST API</a>
+                    <a href="#mqtt" class="toc-link">MQTT Integration</a>
+                    <a href="#integrations" class="toc-link">Integrations</a>
+                    <a href="#automation" class="toc-link">Automation</a>
+                </nav>
+            </aside>
+
+            <main class="main-content">
+        <div class="hero">
+            <h1>Advanced Features</h1>
+            <p>API integration, MQTT control, external system integration, and automation</p>
+        </div>
+
+        <!-- Navigation Blocks -->
+        <div class="main-blocks">
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-exchange-alt"></i></div>
+                    <h3>REST API</h3>
+                </div>
+                <p>HTTP endpoints for reading system state and controlling EOS Connect</p>
+                <a href="#rest-api" class="btn">Learn More →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-satellite-dish"></i></div>
+                    <h3>MQTT Integration</h3>
+                </div>
+                <p>Real-time data publishing and command subscription via MQTT</p>
+                <a href="#mqtt" class="btn">Learn More →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-plug"></i></div>
+                    <h3>Integrations</h3>
+                </div>
+                <p>Home Assistant, OpenHAB, EVCC, and inverter integration details</p>
+                <a href="#integrations" class="btn">Learn More →</a>
+            </div>
+            <div class="block-card">
+                <div class="card-header">
+                    <div class="icon"><i class="fas fa-robot"></i></div>
+                    <h3>Automation</h3>
+                </div>
+                <p>Examples for automating EOS Connect with your smart home</p>
+                <a href="#automation" class="btn">Learn More →</a>
+            </div>
+        </div>
+
+        <!-- REST API Section -->
+        <div class="content-section" id="rest-api">
+            <h2><i class="fas fa-globe"></i> REST API</h2>
+            <p>EOS Connect provides a comprehensive REST API on port 8081 (configurable).</p>
+
+            <h3>Main Endpoints</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/battery</code></td>
+                        <td>GET</td>
+                        <td>Battery status (SOC, remaining energy, efficiency)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/controls</code></td>
+                        <td>GET</td>
+                        <td>Current control states and targets</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/forecasts</code></td>
+                        <td>GET</td>
+                        <td>PV and price forecasts</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/optimization</code></td>
+                        <td>GET</td>
+                        <td>Latest optimization results</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/system</code></td>
+                        <td>GET</td>
+                        <td>System information and version</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/evcc</code></td>
+                        <td>GET</td>
+                        <td>EVCC status and modes (if configured)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/controls/mode</code></td>
+                        <td>POST</td>
+                        <td>Set system mode (JSON body)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/controls/charge_power</code></td>
+                        <td>POST</td>
+                        <td>Set grid charge power (JSON body)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Example API Calls</h3>
+            <h4>Get Battery Status</h4>
+            <pre><code>curl http://localhost:8081/api/battery</code></pre>
+            <p>Response:</p>
+            <pre><code>{
+  "soc": 0.75,
+  "capacity_wh": 11059,
+  "remaining_wh": 8294,
+  "charge_efficiency": 0.88,
+  "discharge_efficiency": 0.88
+}</code></pre>
+
+            <h4>Set System Mode to ChargeFromGrid</h4>
+            <pre><code>curl -X POST http://localhost:8081/api/controls/mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "ChargeFromGrid", "duration_minutes": 120}'</code></pre>
+
+            <h4>Get Optimization Schedule</h4>
+            <pre><code>curl http://localhost:8081/api/optimization</code></pre>
+        </div>
+
+        <!-- MQTT Section -->
+        <div class="content-section" id="mqtt">
+            <h2><i class="fas fa-satellite-dish"></i> MQTT Integration</h2>
+            <p>EOS Connect publishes real-time data and subscribes to control commands via MQTT.</p>
+
+            <h3>Configuration</h3>
+            <pre><code>mqtt:
+  enabled: true
+  broker: localhost
+  port: 1883
+  user: mqtt_user
+  password: mqtt_password
+  tls: false
+  ha_mqtt_auto_discovery: true
+  ha_mqtt_auto_discovery_prefix: homeassistant</code></pre>
+
+            <h3>Published Topics</h3>
+            <p>Base topic: <code>&lt;prefix&gt;/eos_connect/</code></p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Topic Suffix</th>
+                        <th>Description</th>
+                        <th>Example Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>battery/soc</code></td>
+                        <td>Battery state of charge</td>
+                        <td>75.5</td>
+                    </tr>
+                    <tr>
+                        <td><code>battery/remaining_wh</code></td>
+                        <td>Remaining energy in Wh</td>
+                        <td>8350</td>
+                    </tr>
+                    <tr>
+                        <td><code>battery/price_euro_per_wh</code></td>
+                        <td>Dynamic battery price</td>
+                        <td>0.00028</td>
+                    </tr>
+                    <tr>
+                        <td><code>pv/current_production_w</code></td>
+                        <td>Current PV production</td>
+                        <td>3500</td>
+                    </tr>
+                    <tr>
+                        <td><code>grid/current_power_w</code></td>
+                        <td>Grid import/export</td>
+                        <td>-1200</td>
+                    </tr>
+                    <tr>
+                        <td><code>control/overall_state</code></td>
+                        <td>Current system mode</td>
+                        <td>Auto</td>
+                    </tr>
+                    <tr>
+                        <td><code>control/target_charge_power</code></td>
+                        <td>Target grid charge power</td>
+                        <td>2000</td>
+                    </tr>
+                    <tr>
+                        <td><code>control/eos_discharge_allowed</code></td>
+                        <td>Discharge allowed state</td>
+                        <td>true</td>
+                    </tr>
+                    <tr>
+                        <td><code>evcc/[name]/mode</code></td>
+                        <td>EVCC charging mode</td>
+                        <td>pv</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Subscribed Topics (Control Commands)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Topic Suffix</th>
+                        <th>Payload</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>control/overall_state/set</code></td>
+                        <td>Auto | ChargeFromGrid | Discharge | Idle | PVOnly</td>
+                        <td>Set system mode</td>
+                    </tr>
+                    <tr>
+                        <td><code>control/override_remain_time/set</code></td>
+                        <td>HH:MM</td>
+                        <td>Set override duration (e.g., "02:00")</td>
+                    </tr>
+                    <tr>
+                        <td><code>control/override_charge_power/set</code></td>
+                        <td>Integer (watts)</td>
+                        <td>Set grid charge power</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>MQTT Examples</h3>
+            <h4>Subscribe to Battery SOC</h4>
+            <pre><code>mosquitto_sub -t "myhome/eos_connect/battery/soc"</code></pre>
+
+            <h4>Set System to Charge from Grid</h4>
+            <pre><code>mosquitto_pub -t "myhome/eos_connect/control/overall_state/set" \
+  -m "ChargeFromGrid"</code></pre>
+
+            <h4>Set Override Duration</h4>
+            <pre><code>mosquitto_pub -t "myhome/eos_connect/control/override_remain_time/set" \
+  -m "01:30"</code></pre>
+
+            <h3>Home Assistant MQTT Auto Discovery</h3>
+            <p>When enabled, EOS Connect automatically creates Home Assistant entities for all sensors and controls.</p>
+            <p>Entities appear as: <code>sensor.eos_connect_battery_soc</code>, <code>switch.eos_connect_discharge_allowed</code>, etc.</p>
+        </div>
+
+        <!-- Integrations Section -->
+        <div class="content-section" id="integrations">
+            <h2><i class="fas fa-plug"></i> External Integrations</h2>
+
+            <h3>Home Assistant Integration</h3>
+            <h4>Add-on Installation</h4>
+            <ol>
+                <li>Add repository: <a href="https://github.com/ohAnd/ha_addons" target="_blank">ohAnd/ha_addons</a></li>
+                <li>Install EOS Connect add-on</li>
+                <li>Configure via add-on UI</li>
+                <li>Enable MQTT in config for auto-discovery</li>
+            </ol>
+
+            <h4>Using Sensors</h4>
+            <p>Configure sensor sources in config.yaml:</p>
+            <pre><code>battery:
+  source: homeassistant
+  url: http://homeassistant:8123
+  access_token: "your_long_lived_access_token"
+  soc_sensor: sensor.battery_soc</code></pre>
+
+            <h3>OpenHAB Integration</h3>
+            <pre><code>load:
+  source: openhab
+  url: http://openhab:8080
+  load_sensor: Load_Power
+
+battery:
+  source: openhab
+  url: http://openhab:8080
+  soc_sensor: Battery_SOC</code></pre>
+
+            <h3>EVCC Integration</h3>
+            <h4>As Data Source</h4>
+            <pre><code>evcc:
+  url: http://192.168.1.100:7070
+
+pv_forecast_source:
+  source: evcc  # Use EVCC's PV forecasts</code></pre>
+
+            <h4>As Control Target</h4>
+            <p>EOS Connect can monitor and control EVCC charging modes:</p>
+            <ul>
+                <li>PV-only charging</li>
+                <li>Min+PV mode</li>
+                <li>Fast charge</li>
+                <li>Off</li>
+            </ul>
+
+            <h3>Fronius Inverter Integration</h3>
+            <h4>Enhanced Interface (Recommended)</h4>
+            <pre><code>inverter:
+  type: fronius_gen24
+  address: 192.168.1.12
+  user: customer
+  password: your_password
+  max_grid_charge_rate: 5000
+  max_pv_charge_rate: 5000</code></pre>
+
+            <div class="alert alert-info">
+                <strong><i class="fas fa-lightbulb"></i> Auto Firmware Detection:</strong> The enhanced interface automatically detects your Fronius firmware version and uses the appropriate authentication method (MD5 or SHA256).
+            </div>
+
+            <h4>Legacy Interface</h4>
+            <p>Use <code>type: fronius_gen24_legacy</code> for corner cases or troubleshooting.</p>
+
+            <h3>EVCC External Battery Control</h3>
+            <p>Universal interface for all EVCC-supported inverters:</p>
+            <pre><code>inverter:
+  type: evcc
+  # Inverter controlled via EVCC's external battery API</code></pre>
+        </div>
+
+        <!-- Automation Examples -->
+        <div class="content-section" id="automation">
+            <h2><i class="fas fa-robot"></i> Automation Examples</h2>
+
+            <h3>Home Assistant Automations</h3>
+
+            <h4>Charge Battery During Cheap Hours</h4>
+            <pre><code>automation:
+  - alias: "Charge battery during low prices"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.electricity_price
+        below: 0.15  # €0.15/kWh
+    condition:
+      - condition: numeric_state
+        entity_id: sensor.eos_connect_battery_soc
+        below: 80
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "myhome/eos_connect/control/overall_state/set"
+          payload: "ChargeFromGrid"
+      - service: mqtt.publish
+        data:
+          topic: "myhome/eos_connect/control/override_remain_time/set"
+          payload: "02:00"</code></pre>
+
+            <h4>Stop Discharge During High Load</h4>
+            <pre><code>automation:
+  - alias: "Preserve battery during high consumption"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.house_power
+        above: 5000  # 5 kW
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "myhome/eos_connect/control/overall_state/set"
+          payload: "Idle"</code></pre>
+
+            <h3>Node-RED Flows</h3>
+            <p>Use MQTT nodes to:</p>
+            <ul>
+                <li>Monitor EOS Connect status</li>
+                <li>Trigger controls based on external events</li>
+                <li>Create custom dashboards</li>
+                <li>Log data to databases</li>
+            </ul>
+
+            <h3>Python Automation Script</h3>
+            <pre><code>import requests
+import json
+
+# Get battery status
+response = requests.get('http://localhost:8081/api/battery')
+battery = response.json()
+
+# If SOC below 20% and prices are low, force charge
+if battery['soc'] < 0.20:
+    requests.post('http://localhost:8081/api/controls/mode',
+        json={'mode': 'ChargeFromGrid', 'duration_minutes': 120})</code></pre>
+        </div>
+
+        <!-- Advanced Configuration -->
+        <div class="content-section">
+            <h2><i class="fas fa-cog"></i> Advanced Configuration Tips</h2>
+
+            <h3>Dynamic Battery Price Calculation</h3>
+            <p>Enable for real cost tracking:</p>
+            <pre><code>battery:
+  price_calculation_enabled: true
+  price_update_interval: 900  # 15 minutes
+  price_history_lookback_hours: 96  # 4 days
+  battery_power_sensor: sensor.battery_power
+  pv_power_sensor: sensor.pv_power
+  grid_power_sensor: sensor.grid_power
+  price_sensor: sensor.electricity_price</code></pre>
+
+            <h3>Multiple PV Installations</h3>
+            <pre><code>pv_forecast:
+  - name: Main_Roof_South
+    azimuth: 180
+    tilt: 25
+    power: 5000
+  - name: Garage_East
+    azimuth: 90
+    tilt: 15
+    power: 2500
+  - name: Carport_West
+    azimuth: 270
+    tilt: 10
+    power: 3000</code></pre>
+
+            <h3>Solcast with Rate Limiting</h3>
+            <pre><code>pv_forecast_source:
+  source: solcast
+  api_key: "your_api_key"
+
+# EOS Connect auto-extends to 2.5h intervals for Solcast
+# to stay within 10 API calls/day limit</code></pre>
+
+            <h3>Temperature-Based Battery Protection</h3>
+            <pre><code>battery:
+  charging_curve_enabled: true
+  sensor_battery_temperature: sensor.byd_battery_temperature
+  # Automatic power reduction in extreme temperatures</code></pre>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="content-section">
+            <h2><i class="fas fa-arrow-right"></i> Next Steps</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <a href="../user-guide/configuration.html" class="btn-primary">Configuration →</a>
+                    <p>Detailed configuration for all features</p>
+                </div>
+                <div class="feature-item">
+                    <a href="../developer/index.html" class="btn-primary">Developer Guide →</a>
+                    <p>Architecture and contribution info</p>
+                </div>
+                <div class="feature-item">
+                    <a href="https://github.com/ohAnd/EOS_connect/discussions" class="btn-primary" target="_blank">Community →</a>
+                    <p>Ask questions and share ideas</p>
+                </div>
+            </div>
+        </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>EOS Connect Documentation | <a href="../index.html">Home</a> | <a href="https://github.com/ohAnd/EOS_connect">GitHub</a> | <a href="https://github.com/sponsors/ohAnd">Sponsor</a></p>
+    </footer>
+
+    <!-- Scroll spy for TOC -->
+    <script>
+        const sections = document.querySelectorAll('.content-section[id]');
+        const tocLinks = document.querySelectorAll('.toc-link');
+
+        function highlightTOC() {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', highlightTOC);
+        highlightTOC();
+    </script>
+</body>
+</html>
