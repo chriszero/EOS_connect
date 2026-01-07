@@ -79,6 +79,19 @@ body {
     color: var(--accent-color);
 }
 
+/* Version badge in navigation */
+.version-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background-color: rgba(74, 158, 255, 0.15);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    margin-left: 0.75rem;
+    letter-spacing: 0.02rem;
+}
+
 .nav-menu {
     display: flex;
     gap: 2rem;
@@ -597,6 +610,13 @@ a:hover {
         font-size: 1rem;
     }
 
+    /* Hide version badge on smaller screens */
+    .version-badge {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.4rem;
+        margin-left: 0.5rem;
+    }
+
     /* Mobile menu toggle button */
     .mobile-menu-toggle {
         display: block;
@@ -750,5 +770,12 @@ html {
         bottom: 1.5rem;
         right: 1.5rem;
         font-size: 1.3rem;
+    }
+}
+
+/* Very small screens - hide version badge completely */
+@media (max-width: 480px) {
+    .version-badge {
+        display: none;
     }
 }

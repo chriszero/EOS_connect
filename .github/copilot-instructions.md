@@ -62,6 +62,36 @@
 - Include docstrings for classes and functions
 - Follow pylint recommendations for formatting
 
+### Code Changes & Documentation Alignment
+
+**MANDATORY: Every code change, new feature, or bugfix MUST be reflected in documentation**
+
+When making ANY code changes:
+
+1. **Identify Documentation Impact**: Determine which doc sections are affected
+
+   - New features → Update what-is, user-guide, and advanced pages
+   - Configuration changes → Update user-guide/configuration.html
+   - API changes → Update advanced/index.html (REST API & MQTT sections)
+   - Bug fixes → Update troubleshooting in user-guide if user-facing
+
+2. **Update All Affected Pages**: Changes must be synchronized across:
+
+   - `/docs` GitHub Pages (primary documentation)
+   - `README.md` (if quick start or core features affected)
+   - `src/CONFIG_README.md` (if configuration parameters changed) - NOTE: This file is being deprecated, integrate changes into README.md instead
+
+3. **Maintain Accuracy**: Documentation must match actual code behavior
+
+   - Verify API endpoint responses match code
+   - Confirm MQTT topic names and payloads match implementation
+   - Validate configuration parameter names, types, and valid values
+   - Update examples to reflect current best practices
+
+4. **Version Consistency**: When `src/version.py` is updated, ensure version display is current on all doc pages
+
+**Failure to update documentation is considered incomplete work**
+
 ### Commit Preparation
 
 - **NEVER commit automatically** - only prepare changes for user review
