@@ -208,6 +208,16 @@ function showMainMenu(version, backend, granularity) {
         
         <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 5px 0;">
 
+        <div onclick="window.open('https://ohand.github.io/EOS_connect/', '_blank'); closeDropdownMenu();" style="cursor: pointer; padding: 10px 15px; transition: background-color 0.2s; display: flex; align-items: center; justify-content: space-between;" 
+            onmouseover="this.style.backgroundColor='rgba(100, 100, 100, 0.5)'" 
+            onmouseout="this.style.backgroundColor='transparent'">
+            <div style="display: flex; align-items: center;">
+                <i class="fa-solid fa-book" style="margin-right: 10px; color: #cccccc; width: 16px;"></i>
+                <span>Documentation</span>
+            </div>
+            <i class="fa-solid fa-external-link-alt" style="font-size: 0.7em; color: #888888;"></i>
+        </div>
+
         <div onclick="window.open('https://github.com/ohAnd/ha_addons/blob/master/eos_connect/CHANGELOG.md', '_blank'); closeDropdownMenu();" style="cursor: pointer; padding: 10px 15px; transition: background-color 0.2s; display: flex; align-items: center; justify-content: space-between;" 
             onmouseover="this.style.backgroundColor='rgba(100, 100, 100, 0.5)'" 
             onmouseout="this.style.backgroundColor='transparent'">

@@ -18,6 +18,9 @@
     <nav class="nav-header">
         <div class="nav-container">
             <a href="../index.html" class="nav-logo"><img src="../assets/images/icon.png" alt="EOS Connect" style="height: 48px; vertical-align: middle; margin-right: 8px;">EOS Connect</a>
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
             <ul class="nav-menu">
                 <li><a href="../index.html">Home</a></li>
                 <li><a href="../what-is/index.html">What Is</a></li>
@@ -1943,6 +1946,47 @@
 
         window.addEventListener('scroll', highlightTOC);
         highlightTOC();
+    </script>
+
+    <!-- Back to Top Button -->
+    <button class="back-to-top" onclick="scrollToTop()" aria-label="Back to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <script>
+function toggleMobileMenu() {
+    const menu = document.querySelector('.nav-menu');
+    menu.classList.toggle('mobile-active');
+}
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.querySelector('.nav-menu');
+    const toggle = document.querySelector('.mobile-menu-toggle');
+    if (menu.classList.contains('mobile-active') && !menu.contains(event.target) && !toggle.contains(event.target)) {
+        menu.classList.remove('mobile-active');
+    }
+});
+    </script>
+
+    <script>
+// Back to top button functionality
+const backToTopButton = document.querySelector('.back-to-top');
+
+window.addEventListener('scroll', function() {
+    if (window.pageYOffset > 300) {
+        backToTopButton.classList.add('visible');
+    } else {
+        backToTopButton.classList.remove('visible');
+    }
+});
+
+function scrollToTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
     </script>
 </body>
 </html>
