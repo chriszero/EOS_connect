@@ -10,16 +10,22 @@ The documentation is published at: **https://ohAnd.github.io/EOS_connect/**
 
 ```
 docs/
-├── index.html                  # Homepage with 4-section overview
+├── index.html                  # Homepage with overview and navigation
 ├── _config.yml                 # Jekyll configuration
-├── .nojekyll                   # Skip Jekyll processing for certain files
+├── .nojekyll                   # Skip Jekyll processing
+├── README.md                   # This file
 ├── assets/
-│   └── css/
-│       └── style.css          # Custom CSS matching app design
+│   ├── css/
+│   │   └── style.css          # Custom CSS matching app design
+│   ├── images/                # Documentation images (icon, logo, screenshots)
+│   ├── includes/              # Template partials (header, footer)
+│   └── js/
+│       └── common.js          # Shared JavaScript functionality
 ├── what-is/
 │   └── index.html             # Section 1: What is EOS Connect
 ├── user-guide/
-│   └── index.html             # Section 2: User Guide (installation, config)
+│   ├── index.html             # Section 2: User Guide (installation)
+│   └── configuration.html     # Configuration reference (all parameters)
 ├── advanced/
 │   └── index.html             # Section 3: Advanced (API, MQTT, automation)
 └── developer/
@@ -29,10 +35,13 @@ docs/
 ## 🎨 Design
 
 The documentation uses custom HTML/CSS matching the EOS Connect application design:
-- Dark theme (matching app's color scheme)
-- Responsive layout
+- Dark theme (matching app's color scheme: rgb(54, 54, 54))
+- Responsive layout with mobile hamburger menu
+- Sticky navigation header and table of contents
+- Back-to-top button for easy navigation
 - Modern, clean interface
-- Easy navigation with 4 main sections
+- FontAwesome icons throughout
+- Draft banner overlay (removable when finalized)
 
 ## 🔧 Local Development
 
@@ -67,8 +76,13 @@ Key CSS classes:
 - `.hero` - Page header sections
 - `.content-section` - Main content blocks
 - `.block-card` - Navigation cards
-- `.feature-grid` - Feature list grid
+- `.feature-grid` - Feature list grid (responsive)
 - `.alert` - Info/warning/success boxes
+- `.nav-header` - Sticky navigation bar
+- `.toc-sidebar` - Table of contents sidebar
+- `.back-to-top` - Back to top button
+- `.draft-banner` - Draft watermark overlay
+- `.mobile-menu-toggle` - Mobile menu button
 
 ### Content Guidelines
 - Keep content user-focused
@@ -102,10 +116,15 @@ Changes will be live within a few minutes.
 ### 2. User Guide (`user-guide/`)
 - Quick start
 - Installation methods (HA, Docker, local)
-- Configuration overview
+- EOS/EVopt server setup
+- Configuration reference (`configuration.html`)
+  - All config.yaml parameters documented
+  - Load, battery, PV forecast settings
+  - Price integration options
+  - Inverter and EVCC configuration
+  - MQTT settings
 - Using the web dashboard
 - Common tasks
-- EOS server setup
 
 ### 3. Advanced Features (`advanced/`)
 - REST API reference
@@ -124,33 +143,51 @@ Changes will be live within a few minutes.
 
 ## 🔗 Relationship to Main README
 
-The main `README.md` in the repository root is now condensed and links to this comprehensive GitHub Pages documentation:
+The main `README.md` and `src/CONFIG_README.md` in the repository root have been streamlined to link to this comprehensive GitHub Pages documentation:
 
-- **README.md** (~150 lines): Quick overview, basic setup, links to docs
-- **GitHub Pages** (full docs): Comprehensive guides, API reference, examples
+- **README.md** (root): Quick overview, basic setup, links to full docs
+- **src/CONFIG_README.md**: Minimal config example, links to configuration.html
+- **GitHub Pages** (full docs): Comprehensive guides, API reference, all parameters
 
 This separation provides:
 - ✅ Clean GitHub repository landing page
 - ✅ Professional, searchable documentation site
-- ✅ Better user experience
-- ✅ Easier maintenance
+- ✅ Better user experience for new and existing users
+- ✅ Easier maintenance (single source of truth for detailed docs)
+- ✅ Sponsorship integration throughout
 
-## 📄 Files Created
+## 📄 Key Features
 
-New condensed files (to replace existing):
-- `README_NEW.md` → Should replace `README.md`
-- `src/CONFIG_README_NEW.md` → Should replace `src/CONFIG_README.md`
+Current documentation includes:
+- **Sponsorship links**: GitHub Sponsors integrated in header (coffee icon) and footer
+- **Mobile responsive**: Hamburger menu for screens <768px
+- **Back-to-top button**: Appears after scrolling 300px
+- **EVopt links**: Correct repository (thecem/hassio-evopt) referenced
+- **Temperature protection**: Battery charging curve details with temperature tables
+- **Configuration tables**: Standardized 200px width for parameter names
+- **Draft mode**: Visible banner for review phase (easy to remove)
 
 ## 🛠️ Next Steps
 
-1. Review the generated documentation
-2. Test locally using `python -m http.server 8000`
-3. Replace old README files with new condensed versions:
-   - `mv README_NEW.md README.md`
-   - `mv src/CONFIG_README_NEW.md src/CONFIG_README.md`
-4. Commit and push to repository
-5. Enable GitHub Pages in repository settings
-6. Share the documentation link!
+### Before Publishing:
+1. **Remove draft banner**: Delete the draft banner section from all pages when ready
+2. **Test locally**: Use `python -m http.server 8000` to verify all pages
+3. **Check mobile view**: Test responsive design on narrow screens
+4. **Verify links**: Ensure all internal and external links work
+5. **Review content**: Check for typos, outdated information, accuracy
+
+### Publishing:
+1. Commit and push to repository (develop or main branch)
+2. Enable GitHub Pages in repository settings
+3. Set Source to "Deploy from a branch"
+4. Select branch and set folder to `/docs`
+5. Wait a few minutes for deployment
+6. Share the documentation link: https://ohAnd.github.io/EOS_connect/
+
+### After Publishing:
+1. Monitor GitHub Issues for documentation feedback
+2. Update when new features are added
+3. Keep synchronization between README_new.md files and this documentation
 
 ## 💡 Maintenance Tips
 

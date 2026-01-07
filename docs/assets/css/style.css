@@ -191,6 +191,17 @@ body {
     font-weight: 600;
 }
 
+/* Sub-level TOC links for nested navigation */
+.toc-link.toc-sub {
+    padding-left: 2rem;
+    font-size: 0.85rem;
+    border-left-width: 2px;
+}
+
+.toc-link.toc-sub:hover {
+    padding-left: 2.2rem;
+}
+
 /* Hero Section */
 .hero {
     background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
@@ -554,7 +565,7 @@ a:hover {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 892px) {
     .nav-header {
         padding: 0.75rem 1rem;
     }
