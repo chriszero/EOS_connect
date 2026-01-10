@@ -49,6 +49,7 @@
                     <a href="#data-collection" class="toc-link">Data Collection</a>
                     <a href="#configuration" class="toc-link">Configuration</a>
                     <a href="#common-tasks" class="toc-link">Common Tasks</a>
+                    <a href="#battery-pricing" class="toc-link">Battery Pricing</a>
                     <a href="#battery-overview" class="toc-link">Battery Overview</a>
                     <a href="#troubleshooting" class="toc-link">Troubleshooting</a>
                     <a href="#eos-server-setup" class="toc-link">EOS/EVopt Setup</a>
@@ -375,14 +376,177 @@ recorder:
                 <li>View "Next Optimization" countdown</li>
                 <li>Charts show planned battery SOC curve</li>
             </ol>
+        </div>
 
-            <h3>Monitor Battery Price</h3>
+        <!-- Battery Pricing -->
+        <div class="content-section" id="battery-pricing">
+            <h2><i class="fas fa-coins"></i> Battery Energy Pricing</h2>
+            <p>EOS Connect can track the cost of energy stored in your battery in three different ways. Understanding which pricing mode you're using helps you understand optimization decisions.</p>
+            
+            <h4>Three Battery Pricing Modes</h4>
+            <p><strong>Mode 1: Fixed Static Price</strong> (Default)</p>
+            <ul>
+                <li>Battery energy cost set to a single fixed value (€/Wh)</li>
+                <li>Simple but inaccurate - doesn't reflect actual charging sources</li>
+                <li>Configuration: <code>battery.price_euro_per_wh_accu: 0.00004</code> (default)</li>
+                <li>Use case: Quick setup when you don't have sensor data available</li>
+            </ul>
+
+            <p><strong>Mode 2: External Sensor-Based Price</strong></p>
+            <ul>
+                <li>Battery cost comes from a sensor you provide (e.g., from Home Assistant)</li>
+                <li>Can be dynamically updated by external systems</li>
+                <li>Configuration: <code>battery.price_euro_per_wh_sensor: sensor.battery_price</code></li>
+                <li>Use case: Integration with other energy management systems that already calculate battery cost</li>
+            </ul>
+
+            <p><strong>Mode 3: Dynamic Historical Analysis (LIFO Inventory)</strong> - Recommended</p>
+            <ul>
+                <li>Analyzes actual charging history to determine real energy cost</li>
+                <li>Automatically detects whether energy came from solar (PV) or grid</li>
+                <li>Uses Last-In-First-Out (LIFO) inventory model for accurate current battery value</li>
+                <li>Provides detailed charging session breakdown with costs</li>
+                <li>Configuration: <code>battery.price_calculation_enabled: true</code></li>
+                <li>Use case: Most accurate representation of stored energy value for optimization</li>
+            </ul>
+
+            <h4>Setting Up Dynamic Price Calculation (Recommended)</h4>
+            <p>This mode automatically calculates the real cost of energy currently in your battery by forensically analyzing your charging history over the past 48-96 hours.</p>
+
+            <h5>Step 1: Enable Dynamic Calculation</h5>
+            <pre><code>battery:
+  price_calculation_enabled: true  # Enable historical analysis
+  price_update_interval: 900  # Update every 15 minutes (adjust as needed)
+  price_history_lookback_hours: 96  # Analyze last 4 days (default: 96)</code></pre>
+
+            <h5>Step 2: Configure Required Sensors</h5>
+            <p>Dynamic calculation requires <strong>5 mandatory sensor feeds</strong> from your Home Assistant or OpenHAB:</p>
+            <pre><code>battery:
+  price_calculation_enabled: true
+  
+  # Real-time power sensors
+  battery_power_sensor: sensor.battery_power        # Battery charge/discharge in W
+  pv_power_sensor: sensor.total_pv_power           # Total PV generation in W
+  grid_power_sensor: sensor.grid_power             # Grid import/export in W
+  load_power_sensor: sensor.household_load         # Household consumption in W
+  price_sensor: sensor.electricity_price           # Current market price in €/kWh or ct/kWh
+  
+  # Thresholds (adjust based on your system noise)
+  charging_threshold_w: 50                         # Minimum power to count as "charging" event
+  grid_charge_threshold_w: 100                     # Minimum grid import to attribute to grid vs PV</code></pre>
+
+            <h5>Step 3: Verify Sensor Conventions</h5>
+            <p><strong>Important:</strong> Sensors must follow these conventions for correct attribution:</p>
+            <ul>
+                <li><strong>Battery Power:</strong> Positive = charging, Negative = discharging</li>
+                <li><strong>PV Power:</strong> Generation measured as positive output</li>
+                <li><strong>Grid Power:</strong> Positive = import from grid, Negative = export to grid</li>
+                <li><strong>Load Power:</strong> Household consumption as positive value</li>
+                <li><strong>Price Sensor:</strong> Can be in €/kWh or ct/kWh - system auto-detects</li>
+            </ul>
+
+            <h4>How Dynamic Calculation Works</h4>
             <ol>
-                <li>Enable <code>battery.price_calculation_enabled: true</code></li>
-                <li>Configure required sensors (battery_power, pv_power, grid_power, price)</li>
-                <li>View calculated price in dashboard</li>
-                <li>Historical sessions shown with costs</li>
+                <li><strong>Event Detection:</strong> System scans your battery power history and identifies all periods where battery was charging (above threshold)</li>
+                <li><strong>Source Attribution:</strong> For each charging period, compares PV generation vs grid import to determine energy source</li>
+                <li><strong>Cost Assignment:</strong>
+                    <ul>
+                        <li>Energy from PV → valued at feed-in price (opportunity cost of not exporting)</li>
+                        <li>Energy from Grid → valued at actual market price when charging occurred</li>
+                    </ul>
+                </li>
+                <li><strong>Inventory Valuation (LIFO):</strong> Instead of averaging all sessions, uses Last-In-First-Out approach
+                    <ul>
+                        <li>Looks at most recent charging sessions</li>
+                        <li>Works backward until reaching your current battery level</li>
+                        <li>Results in accurate price reflecting the actual energy currently stored</li>
+                    </ul>
+                </li>
+                <li><strong>Optimization Input:</strong> Final price is sent to optimizer so it knows when discharging is profitable</li>
             </ol>
+
+            <h4>Viewing Battery Price Information</h4>
+            <p>The Battery Overview screen shows detailed pricing information:</p>
+            <ul>
+                <li><strong>Stored Energy Price Card</strong> - Shows current calculated price in ct/kWh (cents per kilowatt-hour)</li>
+                <li><strong>Price Label</strong> - Shows calculation method:
+                    <ul>
+                        <li>"Inventory Valuation" = Dynamic (LIFO) calculation</li>
+                        <li>"External Sensor" = From sensor feed</li>
+                        <li>"Fixed Value" = Static configured price</li>
+                    </ul>
+                </li>
+                <li><strong>PV Share Card</strong> - Shows what percentage of stored energy came from solar vs grid</li>
+                <li><strong>Recent Charging Sessions Chart</strong> - Visual timeline of charging events over analysis period</li>
+                <li><strong>Detailed Session Table</strong> - Lists all detected charging sessions with:
+                    <ul>
+                        <li>Session timing</li>
+                        <li>Total energy charged (kWh)</li>
+                        <li>PV vs Grid breakdown</li>
+                        <li>Cost of that session (€)</li>
+                        <li><strong style="color: #4caf50;">Green highlight</strong> = Sessions currently in your inventory</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h4>Common Issues & Solutions</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Cause</th>
+                        <th>Solution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Price shows "--" or doesn't update</td>
+                        <td>Missing required sensor or sensor not providing data</td>
+                        <td>Verify all 5 sensors are configured and returning data in Home Assistant</td>
+                    </tr>
+                    <tr>
+                        <td>No charging sessions found</td>
+                        <td><code>charging_threshold_w</code> set too high for your system</td>
+                        <td>Lower threshold to 25-50W depending on your battery system noise level</td>
+                    </tr>
+                    <tr>
+                        <td>Sessions show 100% grid or 0% PV</td>
+                        <td>Sensor convention incorrect or threshold settings wrong</td>
+                        <td>Verify battery power sign convention; check grid/PV thresholds match your system</td>
+                    </tr>
+                    <tr>
+                        <td>Price calculation disabled in logs</td>
+                        <td><code>price_calculation_enabled: false</code> in config</td>
+                        <td>Set to <code>true</code> in <code>config.yaml</code> and restart application</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Example Configuration</h4>
+            <p>Complete example for Home Assistant with common sensor entities:</p>
+            <pre><code>battery:
+  source: homeassistant
+  url: http://homeassistant:8123
+  access_token: your_long_lived_access_token
+  
+  # Pricing configuration
+  price_calculation_enabled: true  # Enable dynamic calculation
+  price_update_interval: 900       # Update every 15 minutes
+  price_history_lookback_hours: 96 # Analyze 4 days of history
+  
+  # Required sensors
+  battery_power_sensor: sensor.battery_power
+  pv_power_sensor: sensor.pv_total_power
+  grid_power_sensor: sensor.grid_power
+  load_power_sensor: sensor.home_load_power
+  price_sensor: sensor.tibber_current_price
+  
+  # Thresholds
+  charging_threshold_w: 50
+  grid_charge_threshold_w: 100
+  
+  # Feed-in price (for valuing PV surplus energy)
+  feed_in_price: 0.04  # €0.04/kWh when not charging from grid</code></pre>
         </div>
 
         <!-- Battery Overview -->
