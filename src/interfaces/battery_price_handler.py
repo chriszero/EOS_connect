@@ -187,7 +187,8 @@ class BatteryPriceHandler:
 
             # Log data points received
             logger.debug(
-                "[BATTERY-PRICE] Data points received - Battery: %d, PV: %d, Grid: %d, Load: %d, Price: %d",
+                "[BATTERY-PRICE] Data points received - "
+                "Battery: %d, PV: %d, Grid: %d, Load: %d, Price: %d",
                 len(historical_data.get("battery_power", [])),
                 len(historical_data.get("pv_power", [])),
                 len(historical_data.get("grid_power", [])),
@@ -814,6 +815,13 @@ class BatteryPriceHandler:
         if len(power_points) < 2:
             return totals
 
+        # Track missing sensor data for this event
+        missing_sensors = {
+            "pv": not historical_data.get("pv_power", []),
+            "grid": not historical_data.get("grid_power", []),
+            "load": not historical_data.get("load_power", []),
+        }
+
         # Indices for stream alignment
         indices = {"pv": 0, "grid": 0, "load": 0, "price": 0}
 
@@ -868,6 +876,46 @@ class BatteryPriceHandler:
             totals["total_load_wh"] += load_power * time_hours
             totals["grid_cost_euro"] += (grid_energy_wh / 1000.0) * current_price
 
+            # Diagnostic: PV≈0 but PV attribution occurred while grid import present
+            try:
+                if (
+                    pv_power <= 5.0
+                    and pv_to_bat > 0
+                    and grid_to_bat == 0
+                    and avg_battery_power > self.charging_threshold_w
+                ):
+                    pv_for_load_dbg = min(pv_power, load_power)
+                    remaining_load_dbg = max(0, load_power - pv_for_load_dbg)
+                    grid_for_load_dbg = min(grid_power, remaining_load_dbg)
+                    grid_surplus_dbg = max(0, grid_power - grid_for_load_dbg)
+                    ts_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                    logger.debug(
+                        "[BATTERY-PRICE] PV≈0 but PV attribution occurred | "
+                        "ts=%s pv=%.1fW grid=%.1fW load=%.1fW "
+                        "bat=%.1fW grid_surplus=%.1fW thr=%.1fW",
+                        ts_str,
+                        pv_power,
+                        grid_power,
+                        load_power,
+                        avg_battery_power,
+                        grid_surplus_dbg,
+                        self.grid_charge_threshold_w,
+                    )
+            except (ValueError, AttributeError):
+                # Never fail processing due to diagnostics
+                pass
+
+        # Log warning if sensor data was missing for this event
+        if any(missing_sensors.values()):
+            missing_list = [k for k, v in missing_sensors.items() if v]
+            event_start = power_points[0]["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+            logger.warning(
+                "[BATTERY-PRICE] Missing sensor data (%s) during charging event at %s - "
+                "energy attribution may be inaccurate (grid charging might be misattributed to PV)",
+                ", ".join(missing_list),
+                event_start,
+            )
+
         return totals
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -907,7 +955,8 @@ class BatteryPriceHandler:
         remaining_battery = max(0, battery_power - pv_to_battery)
 
         grid_to_battery = 0.0
-        if grid_surplus > self.grid_charge_threshold_w:
+        # Attribute grid surplus to battery when it meets or exceeds threshold
+        if grid_surplus >= self.grid_charge_threshold_w:
             grid_to_battery = min(remaining_battery, grid_surplus)
             remaining_battery = max(0, remaining_battery - grid_to_battery)
 
