@@ -515,6 +515,11 @@
                 </tbody>
             </table>
 
+            <div class="alert alert-info">
+                <strong><i class="fas fa-plug"></i> EVCC unreachable at startup:</strong>
+                If the EVCC API is down when EOS Connect starts, the service now keeps safe default charger data and keeps retrying instead of stopping the update loop. Once EVCC responds again, loadpoint and vehicle details resume automatically on the next poll.
+            </div>
+
             <h5>inverter</h5>
             <table>
                 <thead>
