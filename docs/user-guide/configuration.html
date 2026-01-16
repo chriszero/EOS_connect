@@ -2200,16 +2200,10 @@ battery:
   charge_efficiency: 0.88 # efficiency for charging the battery in [0..1]
   discharge_efficiency: 0.88 # efficiency for discharging the battery in [0..1]
   max_charge_power_w: 5000 # max charging power in W
-  min_soc_percentage: 5 # min battery soc in %
-  max_soc_percentage: 100 # max battery soc in %
-  price_euro_per_wh_accu: 0 # price for battery in €/Wh
-  charging_curve_enabled: true # enable dynamic charging curve for battery (SOC-based + temperature-based if sensor configured)
-  sensor_battery_temperature: "" # sensor for battery temperature in °C - enables temperature protection (optional)
 
 # List of PV forecast source configuration
 pv_forecast_source:
   source: akkudoktor # data source for solar forecast providers akkudoktor, openmeteo, openmeteo_local, forecast_solar, evcc, solcast, default (default uses akkudoktor)
-  api_key: "" # API key for Solcast (required only when source is 'solcast')
 
 # List of PV forecast configurations. Add multiple entries as needed.
 # See Akkudoktor API (https://api.akkudoktor.net/#/pv%20generation%20calculation/getForecast) for more details.
@@ -2219,16 +2213,10 @@ pv_forecast:
     lon: 13.4050 # Longitude for PV forecast
     azimuth: 90.0 # Azimuth for PV forecast
     tilt: 30.0 # Tilt for PV forecast
-    power: 4600 # Power for PV forecast
-    powerInverter: 5000 # Power Inverter for PV forecast
-    inverterEfficiency: 0.9 # Inverter Efficiency for PV forecast
-    horizon: 10,20,10,15 # Horizon to calculate shading up to 360 values to describe shading situation for your PV.
 
 # Inverter configuration
 inverter:
   type: default  # Type of inverter - fronius_gen24, fronius_gen24_legacy, evcc, default (default will disable inverter control - only displaying the target state) - preset: default
-  max_grid_charge_rate: 5000 # Max inverter grid charge rate in W - default: 5000
-  max_pv_charge_rate: 5000 # Max inverter PV charge rate in W - default: 5000
 
 # EVCC configuration
 evcc:

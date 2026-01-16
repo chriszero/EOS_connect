@@ -69,6 +69,25 @@ pv_forecast:
     lon: 13.4050
     azimuth: 180
     tilt: 25
+
+# Inverter configuration
+inverter:
+  type: default  # Options: fronius_gen24, fronius_gen24_legacy, evcc, default
+
+# EVCC configuration (optional)
+evcc:
+  url: ""  # Set to your EVCC URL if used, e.g., http://evcc:7070
+
+# MQTT configuration (optional)
+mqtt:
+  enabled: false
+
+# General settings
+refresh_time: 3  # Optimization refresh interval in minutes
+time_zone: Europe/Berlin
+eos_connect_web_port: 8081
+log_level: info
+request_timeout: 10
 ```
 
 ## Project Scope
