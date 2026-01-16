@@ -1,0 +1,191 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "EOS Server Configuration",
+        "description": "Configure the connection to your EOS optimization server.",
+        "data": {
+          "eos_server": "EOS Server Address",
+          "eos_port": "EOS Server Port",
+          "refresh_time": "Refresh Interval (minutes)"
+        }
+      },
+      "battery": {
+        "title": "Battery Configuration",
+        "description": "Configure your battery system parameters.",
+        "data": {
+          "battery_capacity_wh": "Battery Capacity (Wh)",
+          "battery_max_charge_power_w": "Max Charge Power (W)",
+          "battery_min_soc": "Minimum SOC (%)",
+          "battery_max_soc": "Maximum SOC (%)",
+          "battery_charge_efficiency": "Charge Efficiency",
+          "battery_discharge_efficiency": "Discharge Efficiency",
+          "battery_soc_sensor": "Battery SOC Sensor",
+          "charging_curve_enabled": "Enable Charging Curve"
+        }
+      },
+      "pv": {
+        "title": "PV Forecast Configuration",
+        "description": "Select a PV forecast sensor from an existing integration (Solcast, Forecast.Solar, Open-Meteo Solar).\n\nThe sensor should have forecast data in its attributes.",
+        "data": {
+          "pv_forecast_entity": "PV Forecast Sensor"
+        }
+      },
+      "price": {
+        "title": "Electricity Price Configuration",
+        "description": "Select a price sensor from an existing integration (Tibber, ENTSO-E, Nordpool, EPEX Spot, Awattar).\n\nThe sensor should have hourly price data in its attributes.",
+        "data": {
+          "price_source": "Price Source",
+          "price_entity": "Electricity Price Sensor",
+          "fixed_price": "Fixed Price (€/kWh)",
+          "feed_in_price": "Feed-in Tariff (€/kWh)"
+        }
+      },
+      "load": {
+        "title": "Load Configuration",
+        "description": "Configure your household load sensor.",
+        "data": {
+          "load_sensor": "Load Power Sensor",
+          "max_grid_charge_rate": "Max Grid Charge Rate (W)",
+          "max_pv_charge_rate": "Max PV Charge Rate (W)"
+        }
+      },
+      "evcc": {
+        "title": "EVCC Configuration (Optional)",
+        "description": "Connect EVCC for EV charging monitoring and battery control.\n\nIf EVCC is enabled, battery control will be performed via EVCC.",
+        "data": {
+          "evcc_enabled": "Enable EVCC",
+          "evcc_url": "EVCC Server URL (e.g. http://evcc:7070)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to EOS server",
+      "evcc_cannot_connect": "Cannot connect to EVCC server",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "EOS Energy Optimizer Options",
+        "data": {
+          "refresh_time": "Refresh Interval (minutes)",
+          "pv_forecast_entity": "PV Forecast Sensor",
+          "price_entity": "Electricity Price Sensor",
+          "battery_min_soc": "Minimum SOC (%)",
+          "battery_max_soc": "Maximum SOC (%)",
+          "max_grid_charge_rate": "Max Grid Charge Rate (W)",
+          "max_pv_charge_rate": "Max PV Charge Rate (W)",
+          "feed_in_price": "Feed-in Tariff (€/kWh)",
+          "charging_curve_enabled": "Enable Charging Curve"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "inverter_mode": {
+        "name": "Inverter Mode"
+      },
+      "ac_charge_demand": {
+        "name": "AC Charge Demand"
+      },
+      "dc_charge_demand": {
+        "name": "DC Charge Demand"
+      },
+      "battery_soc": {
+        "name": "Battery SOC"
+      },
+      "battery_usable_energy": {
+        "name": "Usable Battery Energy"
+      },
+      "battery_dynamic_max_charge": {
+        "name": "Dynamic Max Charge Power"
+      },
+      "optimization_cost": {
+        "name": "Optimization Total Cost"
+      },
+      "optimization_losses": {
+        "name": "Optimization Losses"
+      },
+      "home_appliance_start": {
+        "name": "Home Appliance Start Hour"
+      },
+      "current_price": {
+        "name": "Current Electricity Price"
+      },
+      "current_pv_forecast": {
+        "name": "Current PV Forecast"
+      },
+      "soc_forecast": {
+        "name": "SOC Forecast"
+      },
+      "grid_import_forecast": {
+        "name": "Grid Import Forecast"
+      },
+      "grid_export_forecast": {
+        "name": "Grid Export Forecast"
+      },
+      "optimization_state": {
+        "name": "Optimization State"
+      },
+      "last_optimization": {
+        "name": "Last Optimization"
+      },
+      "next_optimization": {
+        "name": "Next Optimization"
+      },
+      "override_end_time": {
+        "name": "Override End Time"
+      },
+      "override_power": {
+        "name": "Override Charge Power"
+      }
+    },
+    "binary_sensor": {
+      "discharge_allowed": {
+        "name": "Discharge Allowed"
+      },
+      "override_active": {
+        "name": "Override Active"
+      },
+      "charging_from_grid": {
+        "name": "Charging from Grid"
+      },
+      "home_appliance_released": {
+        "name": "Home Appliance Released"
+      },
+      "optimization_ok": {
+        "name": "Optimization OK"
+      }
+    },
+    "select": {
+      "inverter_mode_control": {
+        "name": "Inverter Mode Control"
+      }
+    },
+    "number": {
+      "min_soc": {
+        "name": "Minimum SOC"
+      },
+      "max_soc": {
+        "name": "Maximum SOC"
+      },
+      "override_charge_power": {
+        "name": "Override Charge Power"
+      }
+    },
+    "button": {
+      "refresh_optimization": {
+        "name": "Refresh Optimization"
+      },
+      "clear_override": {
+        "name": "Clear Override"
+      }
+    }
+  }
+}
