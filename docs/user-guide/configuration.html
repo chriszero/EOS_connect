@@ -1264,7 +1264,7 @@
             <p>Configure solar generation forecasts from various providers.</p>
 
             <div class="alert alert-info">
-                <strong><i class="fas fa-info-circle"></i> Note:</strong> Temperature forecasts are always retrieved from Akkudoktor API, so <code>lat</code> and <code>lon</code> are mandatory for all installations regardless of PV forecast source.
+                <strong><i class="fas fa-info-circle"></i> Note:</strong> Temperature forecasts (outside temperature from Akkudoktor) are <b>only retrieved and sent to the optimizer when <code>eos.source</code> is set to <code>eos_server</code></b>. For <code>evopt</code>, temperature is not used in optimization. <code>lat</code> and <code>lon</code> remain mandatory for PV forecast accuracy.
             </div>
 
             <h3>pv_forecast_source.source</h3>

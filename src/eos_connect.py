@@ -359,6 +359,11 @@ pv_interface = PvInterface(
     config_manager.config["pv_forecast"],
     time_frame_base,
     config_manager.config.get("evcc", {}),
+    (
+        True
+        if config_manager.config["eos"].get("source", "eos_server") == "eos_server"
+        else False
+    ),
     config_manager.config.get("time_zone", "UTC"),
 )
 

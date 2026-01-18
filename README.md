@@ -14,6 +14,7 @@ All technical details and advanced setup instructions are maintained there.
 - **Automated Optimization**: Bridges hardware with Akkudoktor EOS or EVopt backends.
 - **Battery Management**: Intelligent charge/discharge control with SOC-based power curves and temperature protection.
 - **Solar Forecasting**: Built-in support for Akkudoktor, Solcast, OpenMeteo, and Forecast.Solar.
+- **Temperature Forecasts**: Outside temperature is only retrieved and sent to the optimizer when using EOS (Akkudoktor) backend. EVopt does not use temperature input.
 - **Dynamic Pricing**: Integration with Tibber, smartenergy.at, and Stromligning.dk for cost-aware energy use.
 - **Home Integration**: Native compatibility with Home Assistant, OpenHAB, EVCC, and MQTT.
 - **Live Dashboard**: Real-time monitoring and manual override controls via a responsive web interface.
@@ -69,6 +70,8 @@ pv_forecast:
     lon: 13.4050
     azimuth: 180
     tilt: 25
+
+# Note: Temperature forecast (outside temperature) is only retrieved and sent to the optimizer when `eos.source: eos_server` is set. For `evopt`, temperature is not required and not used in optimization.
 
 # Inverter configuration
 inverter:
