@@ -609,6 +609,16 @@ class LoadInterface:
                     debug_url,
                 )
 
+            # Sanity check: filter out implausible values
+            if energy_wh < 0 or energy_wh > 100000:
+                logger.warning(
+                    "[LOAD-IF] Outlier detected in load profile: %s Wh at %s."
+                    + " Value replaced with 0.",
+                    energy_wh,
+                    current_time_slot,
+                )
+                energy_wh = 0
+
             load_profile.append(energy_wh)
             logger.debug(
                 "[LOAD-IF] Energy for %s: %5.1f Wh (sum add energy %5.1f Wh - car load: %5.1f Wh)",
