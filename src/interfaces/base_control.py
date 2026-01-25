@@ -199,6 +199,9 @@ class BaseControl:
         Sets the current AC charge demand.
         Uses the optimization_max_charge_power_w to convert relative values
         to ensure consistency with the value sent to the optimizer.
+
+        Note: The value is always stored as Wh for the current slot (hour or 15min),
+        not as W. Conversion to W is only done in get_needed_ac_charge_power().
         """
         current_time = datetime.now(self.time_zone)
         current_hour = current_time.hour
@@ -216,20 +219,22 @@ class BaseControl:
         if not self.override_active:
             self.current_ac_charge_demand = current_charge_demand
             logger.debug(
-                "[BASE-CTRL] set AC charge demand for current slot %s:%s -> %s W -"
-                + " based on optimization max charge power %s W",
+                "[BASE-CTRL] set AC charge demand for current slot %s:%s -> %.2f Wh"
+                + " (slot=%ds, max=%s W)",
                 current_hour,
                 minute_str,
                 self.current_ac_charge_demand,
+                self.time_frame_base,
                 self.optimization_max_charge_power_w,
             )
         elif self.override_active_since > time.time() - 2:
             logger.debug(
-                "[BASE-CTRL] OVERRIDE AC charge demand for current hour %s:%s -> %s W -"
-                + " based on max charge power %s W",
+                "[BASE-CTRL] OVERRIDE AC charge demand for current slot %s:%s -> %.2f Wh"
+                + " (slot=%ds, max=%s W)",
                 current_hour,
                 minute_str,
                 self.current_ac_charge_demand,
+                self.time_frame_base,
                 self.config["battery"]["max_charge_power_w"],
             )
         self.__set_current_overall_state()
@@ -478,19 +483,20 @@ class BaseControl:
                         )
 
         # Check for changes
+
         changes = [
             (
-                "AC charge demand",
+                "AC charge demand (Wh/slot)",
                 self.current_ac_charge_demand,
                 self.last_ac_charge_demand,
             ),
             (
-                "DC charge demand",
+                "DC charge demand (Wh/slot)",
                 self.current_dc_charge_demand,
                 self.last_dc_charge_demand,
             ),
             (
-                "Battery charge max",
+                "Battery charge max (W)",
                 self.current_bat_charge_max,
                 self.last_bat_charge_max,
             ),
@@ -503,7 +509,7 @@ class BaseControl:
                 self._state_change_timestamps.pop(0)
             for name, curr, last in changes:
                 if curr != last:
-                    logger.info("[BASE-CTRL] %s changed to %s W", name, curr)
+                    logger.info("[BASE-CTRL] %s changed to %.2f", name, curr)
             if not value_changed:
                 logger.debug(
                     "[BASE-CTRL] overall state changed to %s",
