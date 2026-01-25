@@ -263,7 +263,7 @@ The system repeats this process periodically, e.g., every 3 minutes, as defined 
 
 <div align="center">
 
-<img src="doc/eos_connect_flow.png" alt="EOS connect flow" width="450"/>
+<img src="docs\assets\images\eos_connect_flow.png" alt="EOS connect flow" width="450"/>
 
 <br>
 <sub><i>Figure: EOS Connect process flow</i></sub>
@@ -340,7 +340,7 @@ The dashbaord of **EOS connect** is available at `http://localhost:8081`.
 - **Battery Overview**: Detailed analysis of battery costs, charging sessions, and PV/Grid ratios. Accessible via the main menu or by clicking the battery SOC/Capacity icons.
 - **Log Viewer**: Real-time application logs with component-based filtering (e.g., `BATTERY-PRICE`, `OPTIMIZER`).
 
-![webpage screenshot](doc/screenshot_0_1_20.png)
+![webpage screenshot](docs\assets\images\screenshot_0_1_20.png)
 
 ## Provided Data per **EOS connect** API
 

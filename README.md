@@ -1,41 +1,99 @@
-# EOS Connect
+
+
+
+<table>
+  <tr>
+    <td width="130"><img src="docs/assets/images/logo.png" alt="EOS Connect Logo" width="120"/></td>
+    <td style="vertical-align: middle;"><h1 style="margin:0; padding-left:10px;">EOS Connect</h1></td>
+  </tr>
+</table>
+
+**For full documentation, guides, and configuration details, visit:**  
+[https://ohAnd.github.io/EOS_connect/](https://ohAnd.github.io/EOS_connect/)
+
+---
 
 ## Overview
-EOS Connect is an open-source integration and control platform for intelligent energy management. It acts as the orchestration layer between your energy hardware (inverters, batteries, PV forecasts) and external optimization engines.
+EOS Connect is an open-source tool for intelligent energy management and optimization. It acts as the orchestration layer between your energy hardware (inverters, batteries, PV forecasts) and external optimization engines. EOS Connect is an integration and control platform—not an optimizer. Optimization calculations are performed by external servers:
+- [Akkudoktor EOS](https://github.com/Akkudoktor-EOS/EOS)
+- [EVopt](https://github.com/thecem/hassio-evopt)
 
-## Detailed Documentation
-For complete guides, tutorials, and configuration references, please visit our official documentation:
+EOS Connect fetches real-time and forecast data, processes it via your chosen optimizer, and controls devices to optimize your energy usage and costs.
 
-### [https://ohAnd.github.io/EOS_connect/](https://ohAnd.github.io/EOS_connect/)
-
-All technical details and advanced setup instructions are maintained there.
+---
 
 ## Key Features
-- **Automated Optimization**: Bridges hardware with Akkudoktor EOS or EVopt backends.
-- **Battery Management**: Intelligent charge/discharge control with SOC-based power curves and temperature protection.
-- **Solar Forecasting**: Built-in support for Akkudoktor, Solcast, OpenMeteo, and Forecast.Solar.
-- **Temperature Forecasts**: Outside temperature is only retrieved and sent to the optimizer when using EOS (Akkudoktor) backend. EVopt does not use temperature input.
-- **Dynamic Pricing**: Integration with Tibber, smartenergy.at, and Stromligning.dk for cost-aware energy use.
-- **Home Integration**: Native compatibility with Home Assistant, OpenHAB, EVCC, and MQTT.
-- **Live Dashboard**: Real-time monitoring and manual override controls via a responsive web interface.
+- **Automated Energy Optimization:** Uses real-time and forecast data to maximize self-consumption and minimize grid costs.
+- **Battery and Inverter Management:** Charge/discharge control, grid/PV modes, dynamic charging curves.
+- **Integration with Smart Home Platforms:** Home Assistant (MQTT auto discovery), OpenHAB, EVCC, and MQTT for seamless data exchange and automation.
+- **Dynamic Web Dashboard:** Live monitoring, manual control, and visualization of your energy system.
+- **Cost Optimization:** Aligns energy usage with dynamic electricity prices (Tibber, smartenergy.at, Stromligning.dk).
+- **Flexible Configuration:** Easy to set up and extend for a wide range of energy systems and user needs.
+
+---
+
+
+## How It Works
+EOS Connect periodically collects:
+- Local energy consumption data
+- PV solar forecasts for the next 48 hours
+- Upcoming energy prices
+
+It sends this data to the optimizer (EOS or EVopt), which returns a prediction and recommended control strategy. EOS Connect then applies these controls to your devices (inverter, battery, EVCC, etc.). All scheduling and timing is managed by EOS Connect.
+
+<div align="center">
+  <img src="docs\assets\images\eos_connect_flow.png" alt="EOS Connect process flow" width="450"/>
+  <br>
+  <sub><i>Figure: EOS Connect process flow</i></sub>
+</div>
+
+Supported data sources and integrations:
+- **Home Assistant:** Full MQTT integration with auto discovery, entity setup, and automation.
+- **OpenHAB:** MQTT-based monitoring and control.
+- **EVCC:** Monitors and controls EV charging modes and states.
+- **Inverter Interfaces:** Fronius GEN24 (with automatic firmware detection), legacy fallback, and more.
+
+---
+
+
 
 ## Quick Start
-1. **Requirements**: A running instance of [Akkudoktor EOS](https://github.com/Akkudoktor-EOS/EOS) or [EVopt](https://github.com/thecem/hassio-evopt).
-2. **Installation**:
-   - **Home Assistant**: Add repository `ohAnd/ha_addons` and install the EOS Connect add-on.
-   - **Docker**: `docker-compose up -d`
-3. **Configuration**: Edit `src/config.yaml` to point to your devices and optimization server.
-4. **Access**: Open `http://localhost:8081` (or your HA IP) to view the dashboard.
 
-## Configuration
-The behavior of EOS Connect is defined in the `config.yaml` file. A default configuration will be created automatically on the first start if it does not exist.
+### Home Assistant Installation (Recommended)
+1. **Requirements:**
+   - Home Assistant (latest version recommended)
+   - EOS or EVopt server (can be installed as part of the setup; see below)
 
-### Full Configuration Reference
-For complete documentation of all parameters, including solar forecasting, electricity prices, inverter controls, and advanced options, visit:
+2. **Option A: Install EOS Connect Add-on:**
+   - Add the [ohAnd/ha_addons](https://github.com/ohAnd/ha_addons) repository to your Home Assistant add-on store.
+   - Install the **EOS Connect** add-on from the store.
+  
+3. **Option B: Install EOS Connect Add-on:**
+   - If you want to use EOS as your optimization backend, add the [Duetting/ha_eos_addon](https://github.com/Duetting/ha_eos_addon) or [thecem/ha_eos_addon](https://github.com/thecem/ha_eos_addon) repository to your Home Assistant add-on store and install the EOS add-on, or ensure your EOS server is running and reachable.
+   - If you prefer the lightweight EVopt backend, install [thecem/hassio-evopt](https://github.com/thecem/hassio-evopt) and make sure it is running.
 
-**[https://ohAnd.github.io/EOS_connect/user-guide/configuration.html](https://ohAnd.github.io/EOS_connect/user-guide/configuration.html)**
+4. **Configure:**
+    - Configuration is managed directly via the Home Assistant add-on UI. No manual editing of the config file is required—the add-on processes your settings in the background and applies them to EOS Connect automatically.
+    - See the [user-guide/configuration](https://ohAnd.github.io/EOS_connect/user-guide/configuration.html) for full details.
 
-### Minimal Configuration Example
+5. **Start & Access:**
+    - Start the EOS Connect add-on from the Home Assistant UI.
+    - Open `http://homeassistant.local:8081` (or your HA IP) to view the dashboard.
+
+<div align="center">
+  <img src="docs/assets/images/screenshot_0_1_20.png" alt="EOS Connect dashboard screenshot" width="600"/>
+  <br>
+  <sub><i>Figure: EOS Connect dashboard</i></sub>
+</div>
+
+---
+
+**Other Installation Options:**
+- Docker, manual, and advanced setups are supported. See the [docs](https://ohAnd.github.io/EOS_connect/user-guide/index.html) for details.
+
+---
+
+## Minimal Configuration Example
 ```yaml
 # Load configuration
 load:
@@ -93,15 +151,26 @@ log_level: info
 request_timeout: 10
 ```
 
-## Project Scope
-Please note that EOS Connect is an **integration and control platform**, not an optimizer. It collects system data and follows the strategies provided by external optimization backends:
-- **Akkudoktor EOS** (Recommended) - [https://github.com/Akkudoktor-EOS/EOS](https://github.com/Akkudoktor-EOS/EOS)
-- **EVopt** - [https://github.com/thecem/hassio-evopt](https://github.com/thecem/hassio-evopt)
+<div style="margin-top: 1em; padding: 0.8em; background: #222; border-radius: 10px; color: #eee;">
+<i class="fas fa-info-circle" style="color: #4a9eff;"></i>
+ <strong>Note:</strong> This minimal configuration is sufficient for basic operation with static profiles and default APIs.<br>
+For advanced integrations (Home Assistant, OpenHAB, Solcast, Fronius, Tibber, etc.), <strong>additional fields are required</strong> (e.g., <code>url</code>, <code>access_token</code>, <code>soc_sensor</code>, <code>api_key</code>, <code>resource_id</code>, etc.).<br>
+See the <a href="https://ohAnd.github.io/EOS_connect/user-guide/configuration.html" style="color: #4a9eff;">full configuration documentation</a> for details on all options and required fields for your setup.
+</div>
+```
+---
+
+## Troubleshooting & Advanced Configuration
+For troubleshooting and advanced configuration, see the [docs](https://ohAnd.github.io/EOS_connect/).
+
+---
 
 ## Support & Sponsoring
 If you find this project useful and would like to support its development, please consider sponsoring:
-
 [https://github.com/sponsors/ohAnd](https://github.com/sponsors/ohAnd)
+
+## Contributing
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 MIT License - see [LICENSE](LICENSE) for details.

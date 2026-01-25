@@ -114,22 +114,28 @@
 
             <h3>Step 2: Install</h3>
             
-            <h4>Option A: Home Assistant Add-on (Recommended)</h4>
+            <h4>Option A: Home Assistant Add-on</h4>
             <ol>
                 <li>Add repository: <a href="https://github.com/ohAnd/ha_addons" target="_blank">ohAnd/ha_addons</a></li>
-                <li>Install "EOS Server" add-on (or EVopt)</li>
+                <li>Option A: Install <strong>EOS Server</strong> add-on: <a href="https://github.com/Duetting/ha_eos_addon" target="_blank">Duetting/ha_eos_addon</a> or <a href="https://github.com/thecem/ha_eos_addon" target="_blank">thecem/ha_eos_addon</a></li>
+                <li>Option B: Install <strong>EVopt</strong> add-on: <a href="https://github.com/thecem/hassio-evopt" target="_blank">thecem/hassio-evopt</a></li>
                 <li>Install "EOS Connect" add-on</li>
-                <li>Configure both via HA UI</li>
-                <li>Start both add-ons</li>
+                    <li>Easily configure the EOS_connect add-on using the Home Assistant add-on UI—no manual editing of config files is needed, and EOS or EVopt require no special setup. For advanced options or details, see the <a href="configuration.html">user-guide/configuration</a>.</li>
+                </li>
+                <li>Start all add-ons</li>
             </ol>
 
             <h4>Option B: Docker</h4>
-            <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
+                <h4>Option B: Docker</h4>
+                <p>For EOS backend, see <a href="https://github.com/Akkudoktor-EOS/EOS" target="_blank">Akkudoktor EOS</a>. For EVopt backend, see <a href="https://github.com/thecem/hassio-evopt" target="_blank">EVopt</a>.</p>
+                <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
 cd EOS_connect
 docker-compose up --pull always -d</code></pre>
 
             <h4>Option C: Local Python</h4>
-            <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
+                <h4>Option C: Local Python</h4>
+                <p>For EOS backend, see <a href="https://github.com/Akkudoktor-EOS/EOS" target="_blank">Akkudoktor EOS</a>. For EVopt backend, see <a href="https://github.com/thecem/hassio-evopt" target="_blank">EVopt</a>.</p>
+                <pre><code>git clone https://github.com/ohAnd/EOS_connect.git
 cd EOS_connect
 pip install -r requirements.txt
 python src/eos_connect.py</code></pre>
