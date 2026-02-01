@@ -428,7 +428,8 @@ class ControlsManager {
         // Update mode icon and click handler
         this.updateModeIcon(inverterModeNum, overrideActive, controlsData.battery.max_charge_power_dyn);
 
-        if (controlsData.used_optimization_source === "evopt") {
+        // Show experimental banner if optimization source is ??? (t.b.d.) - was introduced in early phase of evopt
+        if (controlsData.used_optimization_source === "tbd") {
             document.getElementById("experimental-banner").style.display = "flex";
         } else {
             document.getElementById("experimental-banner").style.display = "none";

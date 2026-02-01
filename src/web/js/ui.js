@@ -182,6 +182,13 @@ function showMainMenu(version, backend, granularity) {
             <i class="fa-solid fa-sliders" style="margin-right: 10px; color: #cccccc; width: 16px;"></i>
             <span>Override Controls</span>
         </div>
+
+        <div onclick="showBatteryOverviewMenu(); closeDropdownMenu();" style="cursor: pointer; padding: 10px 15px; transition: background-color 0.2s; display: flex; align-items: center;" 
+            onmouseover="this.style.backgroundColor='rgba(100, 100, 100, 0.5)'" 
+            onmouseout="this.style.backgroundColor='transparent'">
+            <i class="fa-solid fa-battery-full" style="margin-right: 10px; color: #cccccc; width: 16px;"></i>
+            <span>Battery Overview</span>
+        </div>
         
         <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 5px 0;">
         
@@ -200,6 +207,16 @@ function showMainMenu(version, backend, granularity) {
         </div>
         
         <hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 5px 0;">
+
+        <div onclick="window.open('https://ohand.github.io/EOS_connect/', '_blank'); closeDropdownMenu();" style="cursor: pointer; padding: 10px 15px; transition: background-color 0.2s; display: flex; align-items: center; justify-content: space-between;" 
+            onmouseover="this.style.backgroundColor='rgba(100, 100, 100, 0.5)'" 
+            onmouseout="this.style.backgroundColor='transparent'">
+            <div style="display: flex; align-items: center;">
+                <i class="fa-solid fa-book" style="margin-right: 10px; color: #cccccc; width: 16px;"></i>
+                <span>Documentation</span>
+            </div>
+            <i class="fa-solid fa-external-link-alt" style="font-size: 0.7em; color: #888888;"></i>
+        </div>
 
         <div onclick="window.open('https://github.com/ohAnd/ha_addons/blob/master/eos_connect/CHANGELOG.md', '_blank'); closeDropdownMenu();" style="cursor: pointer; padding: 10px 15px; transition: background-color 0.2s; display: flex; align-items: center; justify-content: space-between;" 
             onmouseover="this.style.backgroundColor='rgba(100, 100, 100, 0.5)'" 
@@ -472,6 +489,18 @@ function showOverrideControlsMenu() {
         controlsManager.showOverrideMenuFullScreen();
     } else {
         showFullScreenOverlay("Override Controls", "<div style='text-align: center; color: #888; padding: 20px;'>Controls system not initialized</div>");
+        setTimeout(() => closeFullScreenOverlay(), 2000);
+    }
+}
+
+/**
+ * Show battery overview menu using BatteryManager
+ */
+function showBatteryOverviewMenu() {
+    if (batteryManager) {
+        batteryManager.showBatteryOverview();
+    } else {
+        showFullScreenOverlay("Battery Overview", "<div style='text-align: center; color: #888; padding: 20px;'>Battery system not initialized</div>");
         setTimeout(() => closeFullScreenOverlay(), 2000);
     }
 }

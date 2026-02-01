@@ -44,13 +44,13 @@ class OptimizationInterface:
                 self.base_url, self.time_frame_base, self.time_zone
             )
             self.backend_type = "evopt"
-            logger.info("[OPT] Using EVopt backend")
+            logger.info("[OPTIMIZATION] Using EVopt backend")
         elif self.eos_source == "eos_server":
             self.backend = EOSBackend(
                 self.base_url, self.time_frame_base, self.time_zone
             )
             self.backend_type = "eos_server"
-            logger.info("[OPT] Using EOS Server backend")
+            logger.info("[OPTIMIZATION] Using EOS Server backend")
         else:
             raise ValueError(f"Unknown backend source: {self.eos_source}")
 
@@ -103,7 +103,7 @@ class OptimizationInterface:
         #     ]
         #     ac_charge_demand_relative = ac_charge_demand_relative[current_hour]
         #     logger.debug(
-        #         "[OPT] AC charge demand for current hour %s:00 -> %s %%",
+        #         "[OPTIMIZATION] AC charge demand for current hour %s:00 -> %s %%",
         #         current_hour,
         #         ac_charge_demand_relative * 100,
         #     )
@@ -117,7 +117,7 @@ class OptimizationInterface:
         #     ]
         #     dc_charge_demand_relative = dc_charge_demand_relative[current_hour]
         #     logger.debug(
-        #         "[OPT] DC charge demand for current hour %s:00 -> %s %%",
+        #         "[OPTIMIZATION] DC charge demand for current hour %s:00 -> %s %%",
         #         current_hour,
         #         dc_charge_demand_relative * 100,
         #     )
@@ -131,7 +131,7 @@ class OptimizationInterface:
         #     ]
         #     discharge_allowed = bool(discharge_allowed[current_hour])
         #     logger.debug(
-        #         "[OPT] Discharge allowed for current hour %s:00 %s",
+        #         "[OPTIMIZATION] Discharge allowed for current hour %s:00 %s",
         #         current_hour,
         #         discharge_allowed,
         #     )
@@ -167,7 +167,7 @@ class OptimizationInterface:
             self.last_control_data[1]["ac_charge_demand"] = ac_charge[next_step]
             ac_charge_demand_relative = ac_charge[current_step]
             logger.debug(
-                "[OPT] AC charge demand for current step %s (%s) -> %s %%",
+                "[OPTIMIZATION] AC charge demand for current step %s (%s) -> %s %%",
                 current_step,
                 current_step_time.strftime("%Y-%m-%d %H:%M"),
                 ac_charge_demand_relative * 100,
@@ -178,7 +178,7 @@ class OptimizationInterface:
             self.last_control_data[1]["dc_charge_demand"] = dc_charge[next_step]
             dc_charge_demand_relative = dc_charge[current_step]
             logger.debug(
-                "[OPT] DC charge demand for current step %s (%s) -> %s %%",
+                "[OPTIMIZATION] DC charge demand for current step %s (%s) -> %s %%",
                 current_step,
                 current_step_time.strftime("%Y-%m-%d %H:%M"),
                 dc_charge_demand_relative * 100,
@@ -193,7 +193,7 @@ class OptimizationInterface:
             ]
             discharge_allowed = bool(discharge_allowed_arr[current_step])
             logger.debug(
-                "[OPT] Discharge allowed for current step %s (%s): %s",
+                "[OPTIMIZATION] Discharge allowed for current step %s (%s): %s",
                 current_step,
                 current_step_time.strftime("%Y-%m-%d %H:%M"),
                 discharge_allowed,
@@ -206,12 +206,12 @@ class OptimizationInterface:
         ):
             self.set_last_start_solution(optimized_response_in["start_solution"])
             # logger.debug(
-            #     "[OPT] Start solution for current hour %s:00 %s",
+            #     "[OPTIMIZATION] Start solution for current hour %s:00 %s",
             #     current_hour,
             #     self.get_last_start_solution(),
             # )
         else:
-            logger.error("[OPT] No control data in optimized response")
+            logger.error("[OPTIMIZATION] No control data in optimized response")
             response_error = True
 
         self.last_control_data[0]["error"] = int(response_error)
@@ -225,7 +225,7 @@ class OptimizationInterface:
                 self.home_appliance_start_hour == current_hour
             )
             logger.debug(
-                "[OPT] Home appliance - current hour %s:00 - start hour %s - is Released: %s",
+                "[OPTIMIZATION] Home appliance - current hour %s:00 - start hour %s - is Released: %s",
                 current_hour,
                 self.home_appliance_start_hour,
                 self.home_appliance_released,
