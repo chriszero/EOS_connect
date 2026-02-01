@@ -116,6 +116,7 @@ EOS Connect helps you get the most out of your solar and storage systems—wheth
   - OPTION 2: Use the [evcc external battery control](https://docs.evcc.io/docs/integrations/rest-api) to interact with all inverter/ battery systems that [are supported by evcc](https://docs.evcc.io/en/docs/devices/meters) (hint: the dynamic max charge power is currently not supported by evcc external battery control)
   - OPTION 3: using without a direct control interface to get the resulting commands by **EOS connect** MQTT or web API to control within your own environment (e.g. [Integrate inverter e.g. sungrow SH10RT #35](https://github.com/ohAnd/EOS_connect/discussions/35)  )
   - Retrieves real-time data such as grid charge power, discharge power, and battery SOC.
+  - OPTION 4: Use the `homeassistant` inverter type to control any inverter/battery system that is integrated into Home Assistant via configurable service call sequences (e.g., Marstek, Sungrow, Goodwe, or any system with HA entities). See [CONFIG_README](src/CONFIG_README.md) for details.
 - **MQTT Broker**:
   - Acts as the central hub for real-time data exchange.
   - Publishes system states and subscribes to control commands.

@@ -15,6 +15,7 @@
         - [Example Config Entry](#example-config-entry)
         - [Notes](#notes)
     - [Inverter Configuration](#inverter-configuration)
+      - [Home Assistant Inverter Interface (`homeassistant`)](#home-assistant-inverter-interface-homeassistant)
     - [EVCC Configuration](#evcc-configuration)
     - [MQTT Configuration](#mqtt-configuration)
       - [Parameters](#parameters)
@@ -27,6 +28,7 @@
     - [Minimal possible Config Example](#minimal-possible-config-example)
     - [Example: Using EVCC for PV Forecasts](#example-using-evcc-for-pv-forecasts)
     - [Example: Using Solcast for PV Forecasts](#example-using-solcast-for-pv-forecasts)
+    - [Example: Using Home Assistant for Inverter Control (e.g., Marstek)](#example-using-home-assistant-for-inverter-control-eg-marstek)
 <!-- /TOC -->
 
 # Configuration
@@ -327,6 +329,7 @@ Refer to this table and details when editing your `config.yaml` and for troubles
   Specifies the type of inverter. Possible values:  
   - `fronius_gen24`: Use the Fronius Gen24 inverter (enhanced V2 interface with firmware-based authentication for all firmware versions).
   - `fronius_gen24_legacy`: Use the Fronius Gen24 inverter (legacy V1 interface for corner cases).
+  - `homeassistant`: Use a generic Home Assistant-based inverter interface. Controls the inverter/battery via HA service calls (see details below).
   - `evcc`: Use the universal interface via evcc external battery control (evcc config below has to be valid).
   - `default`: Disable inverter control (only display the target state).
 
@@ -341,11 +344,36 @@ Refer to this table and details when editing your `config.yaml` and for troubles
   
   **Note for enhanced interface**: The default `fronius_gen24` interface automatically detects your firmware version and uses the appropriate authentication method. If you recently updated your inverter firmware to 1.38.6-1+ or newer, you may need to reset your password in the WebUI (http://your-inverter-ip/) under Settings -> User Management. New firmware versions require password reset after updates to enable the improved encryption method.
 
+- **`inverter.url`**:
+  The URL of your Home Assistant instance (e.g., `http://192.168.1.129:8123`). (only needed for `homeassistant` type)
+
+- **`inverter.token`**:
+  A long-lived access token from Home Assistant. (only needed for `homeassistant` type)
+  Create one in HA under: Profile → Long-Lived Access Tokens → Create Token.
+
 - **`inverter.max_grid_charge_rate`**:  
   The maximum grid charge rate, in watts (W). Limitation for calculating the target grid charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
 
 - **`inverter.max_pv_charge_rate`**:  
   The maximum PV charge rate, in watts (W). Limitation for calculating the target pv charge power and for EOS inverter model. (currently not supported by evcc external battery control, but shown and calculated - reachable per **EOS connect** API)
+
+#### Home Assistant Inverter Interface (`homeassistant`)
+
+The `homeassistant` inverter type allows controlling any inverter/battery system that is integrated into Home Assistant via configurable service call sequences. This is useful for inverters that don't have a direct API but are accessible through HA entities (e.g., Marstek, Sungrow, Goodwe, or any system with HA integration).
+
+**How it works:**
+For each EOS inverter mode (`charge_from_grid`, `avoid_discharge`, `discharge_allowed`), you define a list of HA service calls that will be executed in order. Each service call specifies:
+
+- **`service`**: The HA service to call (e.g., `select.select_option`, `number.set_value`).
+- **`entity_id`**: The target HA entity.
+- **`data`**: Static parameters for the service call.
+- **`data_template`**: Parameters with template variables. Currently supports `{{ power }}` which is replaced with the dynamic charge power from EOS (only used in `charge_from_grid`).
+
+**Configuration keys (under `inverter:`):**
+
+- **`charge_from_grid`**: List of service calls executed when EOS requests grid charging. Supports `{{ power }}` in `data_template` for dynamic power values.
+- **`avoid_discharge`**: List of service calls executed when EOS requests holding the battery (no discharge, PV charging allowed).
+- **`discharge_allowed`**: List of service calls executed when EOS allows normal battery discharge.
 
 ---
 
@@ -639,6 +667,76 @@ pv_forecast:
 - The `resource_id` is obtained from your Solcast rooftop site configuration
 - `power`, `powerInverter`, and `inverterEfficiency` are still required for proper system scaling
 - **Free Solcast accounts are limited to 10 API calls per day**
+
 - **EOS Connect automatically extends update intervals to 2.5 hours when using Solcast** to stay within the 10 calls/day limit (9.6 calls/day actual usage)
 - Multiple PV installations will result in multiple API calls per update cycle - consider this when planning your configuration
 - If you exceed rate limits, EOS Connect will use the previous forecast data until the next successful API call
+
+### Example: Using Home Assistant for Inverter Control (e.g., Marstek)
+
+When your inverter/battery system is integrated into Home Assistant, you can use the `homeassistant` inverter type to control it via HA service calls. This example shows a configuration for a Marstek battery system:
+
+```yaml
+# Inverter Control Configuration (Marstek via Home Assistant)
+inverter:
+  type: homeassistant
+  url: http://192.168.1.129:8123
+  token: "your_long_lived_access_token_here"
+  max_grid_charge_rate: 2500
+  max_pv_charge_rate: 2500
+
+  # State: Force Charge (Grid)
+  # Uses 'Manual' mode and 'Force Charge' operation
+  charge_from_grid:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Manuell" }
+    - service: select.select_option
+      entity_id: select.mt1_rs485_control_mode
+      data: { "option": "Aktiviert" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Zwangsladen" }
+    - service: number.set_value
+      entity_id: number.mt1_ziel_leistung_manuell
+      data_template: { "value": "{{ power }}" } # Dynamic power from EOS
+
+  # State: Avoid Discharge (Hold)
+  # Uses 'Anti-Feed-In' to allow PV charging, but blocks discharge
+  avoid_discharge:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Anti-Feed-In" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Stop" }
+    - service: number.set_value
+      entity_id: number.mt1_max_entladeleistung_limit
+      data: { "value": 0 } # Block discharge
+    - service: number.set_value
+      entity_id: number.mt1_max_ladeleistung_limit
+      data: { "value": 2500 } # Allow full PV charging
+
+  # State: Discharge Allowed (Normal)
+  # Uses 'Anti-Feed-In' and restores discharge limit
+  discharge_allowed:
+    - service: select.select_option
+      entity_id: select.mt1_betriebsmodus
+      data: { "option": "Anti-Feed-In" }
+    - service: select.select_option
+      entity_id: select.mt1_erzwungene_operation
+      data: { "option": "Stop" }
+    - service: number.set_value
+      entity_id: number.mt1_max_entladeleistung_limit
+      data: { "value": 600 } # Restore discharge limit
+    - service: number.set_value
+      entity_id: number.mt1_max_ladeleistung_limit
+      data: { "value": 2500 }
+```
+
+**Key points:**
+- Replace `url` and `token` with your Home Assistant instance URL and a long-lived access token.
+- Each state (`charge_from_grid`, `avoid_discharge`, `discharge_allowed`) defines a sequence of HA service calls executed in order.
+- Use `data_template` with `{{ power }}` for dynamic values (EOS provides the charge power). Use `data` for static values.
+- The entity IDs and service calls depend on your specific inverter's HA integration. Adapt them to match your setup.
+- This approach works for any inverter/battery that exposes control entities in Home Assistant.
