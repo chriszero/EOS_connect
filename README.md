@@ -51,7 +51,7 @@ Supported data sources and integrations:
 - **Home Assistant:** Full MQTT integration with auto discovery, entity setup, and automation.
 - **OpenHAB:** MQTT-based monitoring and control.
 - **EVCC:** Monitors and controls EV charging modes and states.
-- **Inverter Interfaces:** Fronius GEN24 (with automatic firmware detection), legacy fallback, and more.
+- **Inverter Interfaces:** Fronius GEN24 (with automatic firmware detection), legacy fallback, generic Home Assistant inverter control (e.g., Marstek, Sungrow, Goodwe), and more.
 
 ---
 
@@ -133,7 +133,7 @@ pv_forecast:
 
 # Inverter configuration
 inverter:
-  type: default  # Options: fronius_gen24, fronius_gen24_legacy, evcc, default
+  type: default  # Options: fronius_gen24, fronius_gen24_legacy, homeassistant, evcc, default
 
 # EVCC configuration (optional)
 evcc:
