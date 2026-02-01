@@ -21,6 +21,7 @@ from interfaces.load_interface import LoadInterface
 from interfaces.battery_interface import BatteryInterface
 from interfaces.inverter_fronius import FroniusWR
 from interfaces.inverter_fronius_v2 import FroniusWRV2
+from interfaces.inverter_ha import InverterHA
 from interfaces.evcc_interface import EvccInterface
 from interfaces.optimization_interface import OptimizationInterface
 from interfaces.price_interface import PriceInterface
@@ -185,6 +186,9 @@ elif inverter_type == "evcc":
         "[Inverter] Inverter type %s - using the universal evcc external battery control.",
         inverter_type,
     )
+elif inverter_type == "homeassistant":
+    logger.info("[Inverter] Using generic Home Assistant inverter control.")
+    inverter_interface = InverterHA(config_manager.config["inverter"])
 else:
     logger.info(
         "[Inverter] Inverter type %s - no external connection."
@@ -1167,10 +1171,13 @@ def change_control_state():
     """
     inverter_fronius_en = False
     inverter_evcc_en = False
+    inverter_ha_en = False
     if inverter_type in ["fronius_gen24", "fronius_gen24_legacy"]:
         inverter_fronius_en = True
     elif config_manager.config["inverter"]["type"] == "evcc":
         inverter_evcc_en = True
+    elif config_manager.config["inverter"]["type"] == "homeassistant":
+        inverter_ha_en = True
 
     current_overall_state = base_control.get_current_overall_state_number()
     current_overall_state_text = base_control.get_current_overall_state()
@@ -1242,6 +1249,8 @@ def change_control_state():
                 inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("force_charge")
+            elif inverter_ha_en:
+                inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|||||_____)",
                 current_overall_state_text,
@@ -1253,6 +1262,8 @@ def change_control_state():
                 inverter_interface.set_mode_avoid_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("avoid_discharge")
+            elif inverter_ha_en:
+                inverter_interface.set_mode_avoid_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-----_____)",
                 current_overall_state_text,
@@ -1264,6 +1275,9 @@ def change_control_state():
                 inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("discharge_allowed")
+            elif inverter_ha_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+++++_____)",
                 current_overall_state_text,
@@ -1274,6 +1288,8 @@ def change_control_state():
                 inverter_interface.set_mode_avoid_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("avoid_discharge")
+            elif inverter_ha_en:
+                inverter_interface.set_mode_avoid_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+---+_____)",
                 current_overall_state_text,
@@ -1285,6 +1301,9 @@ def change_control_state():
                 inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("discharge_allowed")
+            elif inverter_ha_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____-+++-_____)",
                 current_overall_state_text,
@@ -1296,6 +1315,9 @@ def change_control_state():
                 inverter_interface.set_mode_allow_discharge()
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("discharge_allowed")
+            elif inverter_ha_en:
+                inverter_interface.api_set_max_pv_charge_rate(tgt_dc_charge_power)
+                inverter_interface.set_mode_allow_discharge()
             logger.info(
                 "[Main] Inverter mode set to %s (_____+-+-+_____)",
                 current_overall_state_text,
@@ -1306,6 +1328,8 @@ def change_control_state():
                 inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             elif inverter_evcc_en:
                 evcc_interface.set_external_battery_mode("force_charge")
+            elif inverter_ha_en:
+                inverter_interface.set_mode_force_charge(tgt_ac_charge_power)
             logger.info(
                 "[Main] Inverter mode set to %s with %s W (_____|---|_____)",
                 current_overall_state_text,
