@@ -266,13 +266,13 @@ class LoadInterface:
                     # 4. overwrite the orginal data structure.
                     start_idx = 0
                     end_idx = len(filtered_data) - 1
-                    while (start_idx < end_idx):
+                    while start_idx < end_idx:
                         try:
                             float(filtered_data[start_idx]["state"])
                             break
                         except ValueError:
                             start_idx += 1
-                    while (start_idx < end_idx):
+                    while start_idx < end_idx:
                         try:
                             float(filtered_data[end_idx]["state"])
                             break
@@ -291,17 +291,31 @@ class LoadInterface:
                     filtered_data_new = []
                     if duration_hours > 0:
                         power_w = (last_state - first_state) / duration_hours
+                        power_w = max(
+                            0, power_w
+                        )  # Prevent negative from counter resets
                         filtered_data[start_idx]["state"] = power_w
                         filtered_data[end_idx]["state"] = power_w
                         filtered_data_new.append(filtered_data[start_idx])
                         filtered_data_new.append(filtered_data[end_idx])
-                        logger.debug("[LOAD-IF] HOMEASSISTANT - Converted energy to power for '%s': %s is now %f", entity_id, first_time, power_w)
+                        logger.debug(
+                            "[LOAD-IF] HOMEASSISTANT - Converted energy to power for '%s': "
+                            "%.1f Wh over %.2f hours = %.1f W",
+                            entity_id,
+                            last_state - first_state,
+                            duration_hours,
+                            power_w,
+                        )
                     else:
                         filtered_data[start_idx]["state"] = 0.0
                         filtered_data[end_idx]["state"] = 0.0
                         filtered_data_new.append(filtered_data[start_idx])
                         filtered_data_new.append(filtered_data[end_idx])
-                        logger.debug("[LOAD-IF] HOMEASSISTANT - Duration is zero for energy to power conversion for '%s', assuming 0W", entity_id)
+                        logger.debug(
+                            "[LOAD-IF] HOMEASSISTANT - Duration is zero for energy to"
+                            + " power conversion for '%s', assuming 0W",
+                            entity_id,
+                        )
 
                     filtered_data = filtered_data_new
 
@@ -421,7 +435,8 @@ class LoadInterface:
         if len(data["data"]) > 0 and total_duration > 0:
             # Get the timestamp of the last sample
             last_sample_time = datetime.fromisoformat(data["data"][-1]["last_updated"])
-            # The interval end is the latest timestamp in the interval (should be provided externally)
+            # The interval end is the latest timestamp in the interval (should be provided
+            # externally)
             # If not available, assume the interval is 1 hour after the first sample
             interval_end = None
             if "interval_end" in data:
