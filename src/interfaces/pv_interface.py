@@ -55,6 +55,7 @@ class PvInterface:
         config,
         time_frame_base,
         config_special,
+        temperature_forecast_enabled=False,
         timezone="UTC",
     ):
         self.config = config
@@ -63,6 +64,7 @@ class PvInterface:
         # Set time_frame_base, defaulting to 3600 if None or not provided
         self.time_frame_base = time_frame_base if time_frame_base is not None else 3600
         self.config_special = config_special
+        self.temperature_forecast_enabled = temperature_forecast_enabled
         logger.debug(
             "[PV-IF] Initializing with 1st source: %s",
             self.config_source.get("source", "akkudoktor"),
@@ -326,25 +328,25 @@ class PvInterface:
                     self.pv_forcast_request_error["message"],
                 )
             # # special temp forecast if pv config is not given in detail
-            # if self.config and self.config[0]:
-            #     temp_result = self.__get_pv_forecast_akkudoktor_api(
-            #         tgt_value="temperature", pv_config_entry=self.config[0]
-            #     )
-            #     if not temp_result:  # If empty array or None due to API error
-            #         logger.warning(
-            #             "[PV-IF] Temperature forecast API failed - using default"
-            #             + " temperature forecast"
-            #         )
-            #         self.temp_forecast_array = self.__get_default_temperature_forecast()
-            #     else:
-            #         self.temp_forecast_array = temp_result
-            #         # logger.debug(
-            #         #     "[PV-IF] Temperature forecast updated with %d values",
-            #         #     len(temp_result),
-            #         # )
-            # else:
-            #     self.temp_forecast_array = self.__get_default_temperature_forecast()
-            # logger.info("[PV-IF] PV and Temperature updated")
+            if self.config and self.config[0] and self.temperature_forecast_enabled:
+                temp_result = self.__get_pv_forecast_akkudoktor_api(
+                    tgt_value="temperature", pv_config_entry=self.config[0]
+                )
+                if not temp_result:  # If empty array or None due to API error
+                    logger.warning(
+                        "[PV-IF] Temperature forecast API failed - using default"
+                        + " temperature forecast"
+                    )
+                    self.temp_forecast_array = self.__get_default_temperature_forecast()
+                else:
+                    self.temp_forecast_array = temp_result
+                    # logger.debug(
+                    #     "[PV-IF] Temperature forecast updated with %d values",
+                    #     len(temp_result),
+                    # )
+            else:
+                self.temp_forecast_array = self.__get_default_temperature_forecast()
+            logger.info("[PV-IF] PV and Temperature updated")
             # Break the sleep interval into smaller chunks to allow immediate shutdown
             sleep_interval = self.update_interval
             while sleep_interval > 0:
@@ -1142,22 +1144,15 @@ class PvInterface:
         url = self.config_special.get("url", "").rstrip("/") + "/api/state"
         logger.debug("[PV-IF] Fetching PV forecast from EVCC API: %s", url)
 
-        def request_func():
+        def request_and_parse():
+            """
+            Perform the GET request and parse the EVCC JSON payload.
+            This keeps request and parsing in the same retried closure so
+            _retry_request never returns a non-Response that would later
+            be used as if it were a Response object.
+            """
             response = requests.get(url, timeout=5)
             response.raise_for_status()
-            return response
-
-        def error_handler(error_type, exception):
-            return self._handle_interface_error(
-                error_type,
-                f"EVCC API error: {exception}",
-                pv_config_entry,
-                "evcc",
-            )
-
-        response = self._retry_request(request_func, error_handler)
-
-        def json_func():
             data = response.json()
             solar_forecast_all = data.get("forecast", {}).get("solar", {})
             solar_forecast_scale = solar_forecast_all.get("scale", "unknown")
@@ -1168,7 +1163,15 @@ class PvInterface:
             )
             return solar_forecast, solar_forecast_scale
 
-        result = self._retry_request(json_func, error_handler)
+        def error_handler(error_type, exception):
+            return self._handle_interface_error(
+                error_type,
+                f"EVCC API error: {exception}",
+                pv_config_entry,
+                "evcc",
+            )
+
+        result = self._retry_request(request_and_parse, error_handler)
         if not result:
             return self._handle_interface_error(
                 "no_valid_data",

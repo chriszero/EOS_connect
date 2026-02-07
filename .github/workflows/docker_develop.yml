@@ -15,12 +15,12 @@ name: Develop - build image and push
 on:
   push:
     branches: ["develop"]
-  pull_request:
-    branches: ["develop"]
+  # pull_request:
+  #   branches: ["develop"]
   workflow_dispatch: # allows manual triggering of the workflow
 
 env:
-  VERSION_PREFIX: 0.2.29.
+  VERSION_PREFIX: 0.2.31.
   VERSION_SUFFIX: -develop
 
 jobs:
@@ -33,7 +33,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
