@@ -191,7 +191,7 @@
                 </tr>
                 <tr>
                     <th>Unit</th>
-                    <td>Watts (W)</td>
+                    <td>Watts (W) or energy (Wh) for Home Assistant energy entities</td>
                 </tr>
                 <tr>
                     <th>Examples</th>
@@ -202,7 +202,7 @@
                 </tr>
                 <tr>
                     <th>Notes</th>
-                    <td>Represents overall net household load (total house consumption). Positive (consumption) or negative (feed-in) values are converted to absolute positive internally.</td>
+                    <td>Represents overall net household load (total house consumption). Positive (consumption) or negative (feed-in) values are converted to absolute positive internally. Home Assistant <strong>energy</strong> entities (device_class: <code>energy</code>) are supported and converted to average power per time frame. Feature contributed by <a href="https://github.com/forouher" target="_blank">Dariush Forouher</a>.</td>
                 </tr>
             </table>
 
@@ -2071,16 +2071,16 @@
 
             <h3 id="example-full">Full Configuration Example</h3>
             <p>This complete example will be automatically generated at first startup. Copy and customize for your setup:</p>
-            <pre><code class="yaml"># Load configuration
+                        <pre><code class="yaml"># Load configuration
 load:
-  source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
-  url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
-  access_token: abc123 # access token for homeassistant (optional)
-  load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. (If not needed, set to "")
-  additional_load_1_sensor: "additional_load_1_sensor" # item / entity for additional load power. (If not needed set to "")
-  additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (If not needed set to "")
-  additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (If not needed set to "")
+    source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
+    url: http://homeassistant:8123 # URL for openhab or homeassistant (e.g. http://openhab:8080 or http://homeassistant:8123)
+    access_token: abc123 # access token for homeassistant (optional)
+    load_sensor: Load_Power # item / entity for load power data in watts (or HA energy entity in Wh)
+    car_charge_load_sensor: Wallbox_Power # item / entity for wallbox power data in watts. (If not needed, set to "")
+    additional_load_1_sensor: "additional_load_1_sensor" # item / entity for additional load power. (If not needed set to "")
+    additional_load_1_runtime: 2 # runtime for additional load 1 in minutes - default: 0 (If not needed set to "")
+    additional_load_1_consumption: 1500 # consumption for additional load 1 in Wh - default: 0 (If not needed set to "")
 
 # EOS server configuration
 eos:
@@ -2172,11 +2172,11 @@ request_timeout: 10 # Request timeout for Home Assistant and OpenHAB API calls i
             <div class="alert alert-info">
                 <strong><i class="fas fa-info-circle"></i> Note:</strong> Within HA addon, unused parameters will be automatically added after saving. For standalone installations, use empty strings <code>""</code> for unused parameters.
             </div>
-            <pre><code class="yaml"># Load configuration
+                        <pre><code class="yaml"># Load configuration
 load:
-  source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
-  load_sensor: Load_Power # item / entity for load power data in watts
-  car_charge_load_sensor: "" # item / entity for wallbox power data in watts. (If not needed, set to "")
+    source: default  # Data source for load power - openhab, homeassistant, default (using a static load profile)
+    load_sensor: Load_Power # item / entity for load power data in watts (or HA energy entity in Wh)
+    car_charge_load_sensor: "" # item / entity for wallbox power data in watts. (If not needed, set to "")
 
 # EOS server configuration
 eos:
